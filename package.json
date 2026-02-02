@@ -19,7 +19,8 @@
         "LICENSE"
     ],
     "scripts": {
-        "build": "vite build && vue-tsc --declaration --emitDeclarationOnly --declarationDir dist",
+        "build": "vite build",
+        "build:types": "vue-tsc --declaration --emitDeclarationOnly --declarationDir dist",
         "typecheck": "vue-tsc --noEmit",
         "test": "vitest run",
         "test:watch": "vitest"
