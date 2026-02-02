@@ -1,5 +1,5 @@
 {
-    "name": "dirk-rte-vue",
+    "name": "rich-text-editor-vue-tiptap",
     "version": "0.1.0",
     "description": "Rich text editor component built with Vue 3 and TipTap.",
     "type": "module",
