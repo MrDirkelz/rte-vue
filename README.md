@@ -15,7 +15,7 @@ A fully configurable rich text editor component built with Vue 3 and TipTap. Des
 ## Installation
 
 ```bash
-npm install dirk-rte-vue
+npm install rich-text-editor-vue-tiptap
 ```
 
 ## Usage
@@ -25,7 +25,7 @@ npm install dirk-rte-vue
 ```vue
 <script setup>
 import { ref } from "vue";
-import { RichTextEditorStandalone } from "dirk-rte-vue";
+import { RichTextEditorStandalone } from "rich-text-editor-vue-tiptap";
 
 const content = ref("");
 </script>
@@ -44,7 +44,7 @@ const content = ref("");
 ```vue
 <script setup>
 import { ref } from "vue";
-import { RichTextEditorStandalone } from "dirk-rte-vue";
+import { RichTextEditorStandalone } from "rich-text-editor-vue-tiptap";
 
 const content = ref("");
 const language = ref("en");
@@ -247,7 +247,7 @@ Hook to transform HTML before pasting into editor. Useful for cleaning up Micros
 
 ```vue
 <script setup>
-import { formatPastedHtml } from "dirk-rte-vue";
+import { formatPastedHtml } from "rich-text-editor-vue-tiptap";
 </script>
 
 <template>
@@ -375,7 +375,7 @@ Override individual toolbar buttons.
 ```vue
 <script setup>
 import { ref } from "vue";
-import { RichTextEditorStandalone, formatPastedHtml } from "dirk-rte-vue";
+import { RichTextEditorStandalone, formatPastedHtml } from "rich-text-editor-vue-tiptap";
 
 const content = ref("");
 
