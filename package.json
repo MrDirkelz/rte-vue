@@ -1,6 +1,6 @@
 {
     "name": "rte-vue",
-    "version": "0.1.4",
+    "version": "0.1.5",
     "description": "Rich text editor component built with Vue 3 and TipTap.",
     "type": "module",
     "main": "dist/index.cjs",
