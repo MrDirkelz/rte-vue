@@ -1,12 +1,12 @@
 <script setup lang="ts">
 /**
- * RichTextEditorStandalone
+ * RTextEditor
  *
  * A fully configurable, framework-agnostic rich text editor component.
  *
  * @component
  * @example
- * <RichTextEditorStandalone
+ * <RTextEditor
  *   v-model:text="content"
  *   title="Edit Content"
  *   placeholder="Start typing..."
@@ -17,7 +17,21 @@ import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import { computed, nextTick, ref, watch } from "vue";
 import type { Component } from "vue";
+import MarkdownIt from "markdown-it";
+import TurndownService from "turndown";
 import formatPastedHtml from "./formatPastedHtml";
+
+const markdownParser = new MarkdownIt();
+const turndownService = new TurndownService({
+    headingStyle: "atx",
+    codeBlockStyle: "fenced",
+});
+
+/**
+ * Heading level type for TipTap
+ * @typedef {number} HeadingLevel
+ */
+export type HeadingLevel = 1 | 2 | 3 | 4 | 5 | 6;
 
 /**
  * Available toolbar buttons
@@ -27,10 +41,12 @@ export type ToolbarItem =
     | "bold"
     | "italic"
     | "strike"
+    | "heading1"
     | "heading2"
     | "heading3"
     | "heading4"
     | "heading5"
+    | "heading6"
     | "bulletList"
     | "orderedList"
     | "link"
@@ -47,6 +63,8 @@ export type ToolbarItem =
  * @property {ToolbarItem[]} [toolbarItems] - Items to display in toolbar
  * @property {ToolbarItem[][]} [toolbarGroups] - Organize items into groups
  * @property {Record<ToolbarItem, string>} [toolbarLabels] - Custom button labels
+ * @property {"json" | "markdown"} [contentFormat="json"] - Content format for v-model
+ * @property {number} [headingOffset=0] - Offset for heading levels (0=no offset, 1=increment by 1)
  * @property {Object} [classNames] - Custom CSS classes
  * @property {string} [minHeight] - Min height (e.g., "300px")
  * @property {string} [maxHeight] - Max height (e.g., "500px")
@@ -66,6 +84,8 @@ export type RichTextEditorProps = {
     toolbarItems?: ToolbarItem[];
     toolbarGroups?: ToolbarItem[][];
     toolbarLabels?: Partial<Record<ToolbarItem, string>>;
+    contentFormat?: "json" | "markdown";
+    headingOffset?: number;
     classNames?: {
         root?: string; // Root container
         header?: string; // Header wrapper
@@ -98,6 +118,8 @@ export type RichTextEditorProps = {
 const props = withDefaults(defineProps<RichTextEditorProps>(), {
     disabled: false,
     showToolbar: true,
+    contentFormat: "json",
+    headingOffset: 0,
     transformPastedHtml: formatPastedHtml,
     toolbarItems: () => [
         "bold",
@@ -114,28 +136,60 @@ const props = withDefaults(defineProps<RichTextEditorProps>(), {
     ],
 });
 
+const modelValue = defineModel<string>("modelValue", { default: "" });
 const text = defineModel<string>("text", { default: "" });
 const textLanguage = defineModel<string | undefined>("textLanguage");
+
+// Use modelValue if provided, otherwise fall back to text
+const content = computed({
+    get: () => modelValue.value || text.value,
+    set: (value) => {
+        modelValue.value = value;
+        text.value = value;
+    },
+});
 
 const showLinkModal = ref(false);
 const url = ref("");
 const urlInput = ref<HTMLInputElement | undefined>(undefined);
 const lastEmitted = ref<string | undefined>(undefined);
 
-const editorText = computed(() => {
-    if (!text.value) return "";
-    try {
-        return JSON.parse(text.value);
-    } catch {
-        return text.value;
+/** Deserialize input string to TipTap content based on format */
+function deserializeContent(input: string, format: "json" | "markdown"): any {
+    if (!input) return "";
+    if (format === "markdown") {
+        const html = markdownParser.render(input);
+        return html;
     }
+    // JSON format
+    try {
+        return JSON.parse(input);
+    } catch {
+        return input;
+    }
+}
+
+/** Serialize TipTap editor content to string based on format */
+function serializeContent(editor: any, format: "json" | "markdown"): string {
+    if (!editor) return "";
+    if (format === "markdown") {
+        const html = editor.getHTML();
+        return turndownService.turndown(html);
+    }
+    // JSON format
+    const json = editor.getJSON();
+    return JSON.stringify(json);
+}
+
+const editorText = computed(() => {
+    return deserializeContent(content.value, props.contentFormat ?? "json");
 });
 
 const editor = useEditor({
     content: editorText.value,
     extensions: [
         StarterKit.configure({
-            heading: { levels: [2, 3, 4, 5, 6] },
+            heading: { levels: [1, 2, 3, 4, 5, 6] },
         }),
         Link.configure({ openOnClick: false }),
     ],
@@ -160,22 +214,37 @@ const editor = useEditor({
             const isSave = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s";
             if (!isSave) return false;
             event.preventDefault();
-            props.onSave(text.value);
+            props.onSave(content.value);
             return true;
         },
     },
     onUpdate: ({ editor }) => {
-        const raw = editor.getJSON();
-        const nextValue = JSON.stringify(raw);
+        const nextValue = serializeContent(editor, props.contentFormat ?? "json");
         lastEmitted.value = nextValue;
-        text.value = nextValue;
+        content.value = nextValue;
         props.onChange?.(nextValue);
     },
     onFocus: () => props.onFocus?.(),
     onBlur: () => props.onBlur?.(),
 });
 
-const toolbarItems = computed(() => (props.toolbarItems?.length ? props.toolbarItems : []));
+const defaultToolbarItems: ToolbarItem[] = [
+    "bold",
+    "italic",
+    "strike",
+    "heading2",
+    "heading3",
+    "heading4",
+    "heading5",
+    "bulletList",
+    "orderedList",
+    "link",
+    "unlink",
+];
+
+const toolbarItems = computed(() =>
+    props.toolbarItems?.length ? props.toolbarItems : defaultToolbarItems,
+);
 
 const toolbarGroups = computed(() =>
     props.toolbarGroups?.length ? props.toolbarGroups : [toolbarItems.value],
@@ -205,10 +274,12 @@ const defaultLabels: Record<ToolbarItem, string> = {
     bold: "Bold",
     italic: "Italic",
     strike: "Strike",
+    heading1: "H1",
     heading2: "H2",
     heading3: "H3",
     heading4: "H4",
     heading5: "H5",
+    heading6: "H6",
     bulletList: "Bullets",
     orderedList: "Numbered",
     link: "Link",
@@ -230,14 +301,18 @@ function isActive(item: ToolbarItem) {
             return editor.value.isActive("italic");
         case "strike":
             return editor.value.isActive("strike");
+        case "heading1":
+            return editor.value.isActive("heading", { level: 1 + (props.headingOffset ?? 0) });
         case "heading2":
-            return editor.value.isActive("heading", { level: 2 });
+            return editor.value.isActive("heading", { level: 2 + (props.headingOffset ?? 0) });
         case "heading3":
-            return editor.value.isActive("heading", { level: 3 });
+            return editor.value.isActive("heading", { level: 3 + (props.headingOffset ?? 0) });
         case "heading4":
-            return editor.value.isActive("heading", { level: 4 });
+            return editor.value.isActive("heading", { level: 4 + (props.headingOffset ?? 0) });
         case "heading5":
-            return editor.value.isActive("heading", { level: 5 });
+            return editor.value.isActive("heading", { level: 5 + (props.headingOffset ?? 0) });
+        case "heading6":
+            return editor.value.isActive("heading", { level: 6 + (props.headingOffset ?? 0) });
         case "bulletList":
             return editor.value.isActive("bulletList");
         case "orderedList":
@@ -262,6 +337,7 @@ function isDisabled(item: ToolbarItem) {
 function runCommand(item: ToolbarItem) {
     if (!editor.value) return;
     const chain = editor.value.chain().focus();
+    const offset = props.headingOffset ?? 0;
     switch (item) {
         case "bold":
             chain.toggleBold().run();
@@ -272,17 +348,23 @@ function runCommand(item: ToolbarItem) {
         case "strike":
             chain.toggleStrike().run();
             break;
+        case "heading1":
+            chain.toggleHeading({ level: Math.min(1 + offset, 6) as HeadingLevel }).run();
+            break;
         case "heading2":
-            chain.toggleHeading({ level: 2 }).run();
+            chain.toggleHeading({ level: Math.min(2 + offset, 6) as HeadingLevel }).run();
             break;
         case "heading3":
-            chain.toggleHeading({ level: 3 }).run();
+            chain.toggleHeading({ level: Math.min(3 + offset, 6) as HeadingLevel }).run();
             break;
         case "heading4":
-            chain.toggleHeading({ level: 4 }).run();
+            chain.toggleHeading({ level: Math.min(4 + offset, 6) as HeadingLevel }).run();
             break;
         case "heading5":
-            chain.toggleHeading({ level: 5 }).run();
+            chain.toggleHeading({ level: Math.min(5 + offset, 6) as HeadingLevel }).run();
+            break;
+        case "heading6":
+            chain.toggleHeading({ level: 6 as HeadingLevel }).run();
             break;
         case "bulletList":
             chain.toggleBulletList().run();
@@ -333,7 +415,7 @@ watch(showLinkModal, async () => {
 });
 
 watch(
-    () => text.value,
+    () => content.value,
     (newValue) => {
         if (!editor.value) return;
         if (newValue === lastEmitted.value) return;
@@ -341,12 +423,8 @@ watch(
             editor.value.commands.setContent("");
             return;
         }
-        try {
-            const parsed = JSON.parse(newValue);
-            editor.value.commands.setContent(parsed);
-        } catch {
-            editor.value.commands.setContent(newValue);
-        }
+        const deserialized = deserializeContent(newValue, props.contentFormat ?? "json");
+        editor.value.commands.setContent(deserialized);
     },
 );
 
@@ -355,16 +433,12 @@ watch(
     (newLang, oldLang) => {
         if (!newLang || newLang === oldLang) return;
         if (!editor.value) return;
-        if (!text.value) {
+        if (!content.value) {
             editor.value.commands.setContent("");
             return;
         }
-        try {
-            const parsed = JSON.parse(text.value);
-            editor.value.commands.setContent(parsed);
-        } catch {
-            editor.value.commands.setContent(text.value);
-        }
+        const deserialized = deserializeContent(content.value, props.contentFormat ?? "json");
+        editor.value.commands.setContent(deserialized);
     },
 );
 </script>
@@ -429,16 +503,16 @@ watch(
         </div>
 
         <div :class="['rte-editor', props.classNames?.editor]" :style="editorStyle">
-            <EditorContent
-                :editor="editor"
-                :class="['rte-editor-content', props.classNames?.editorContent]"
-            />
             <div
                 v-if="props.placeholder && isEmpty"
                 :class="['rte-placeholder', props.classNames?.placeholder]"
             >
                 {{ props.placeholder }}
             </div>
+            <EditorContent
+                :editor="editor"
+                :class="['rte-editor-content', props.classNames?.editorContent]"
+            />
         </div>
     </div>
 
@@ -485,7 +559,6 @@ watch(
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    height: 100%;
 }
 
 .rte-header {
@@ -506,53 +579,92 @@ watch(
 .rte-toolbar {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.75rem;
+    gap: 1rem;
+    padding: 0.75rem;
+    background-color: #f4f4f5;
+    border-bottom: 1px solid #e4e4e7;
 }
 
 .rte-toolbar-group {
     display: flex;
-    gap: 0.25rem;
+    gap: 0;
+    border-radius: 0.375rem;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .rte-button {
-    border: 1px solid #d4d4d8;
-    background: #f4f4f5;
-    padding: 0.35rem 0.6rem;
-    border-radius: 0.375rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0;
+    border: 1px solid #e4e4e7;
     font-size: 0.875rem;
     cursor: pointer;
+    background-color: #ffffff;
+    color: #52525b;
+    transition: all 0.15s ease-in-out;
+    font-weight: 500;
+}
+
+.rte-button:first-child {
+    border-radius: 0.375rem 0 0 0.375rem;
+}
+
+.rte-button:last-child {
+    border-radius: 0 0.375rem 0.375rem 0;
+}
+
+.rte-button:hover:not(:disabled) {
+    background-color: #fafafa;
+    border-color: #d4d4d8;
+}
+
+.rte-button:active:not(:disabled) {
+    background-color: #f5f5f5;
 }
 
 .rte-button:disabled {
-    opacity: 0.6;
+    opacity: 0.5;
     cursor: not-allowed;
 }
 
 .rte-button-active {
-    background: #e4e4e7;
+    background-color: #d4d4d8;
+    color: #18181b;
+    border-color: #b4b4b8;
 }
 
 .rte-editor {
     position: relative;
-    border: 1px solid #d4d4d8;
-    border-radius: 0.5rem;
-    background: #ffffff;
-    flex: 1;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+    border: 1px solid #e4e4e7;
+    border-radius: 0.5rem;
+    background-color: #ffffff;
 }
 
 .rte-editor-content {
+    display: flex;
+    flex-direction: column;
     flex: 1;
+    min-height: inherit;
+}
+
+.rte-editor-content :deep(.tiptap) {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: inherit;
 }
 
 .rte-placeholder {
     position: absolute;
     top: 0.75rem;
     left: 0.75rem;
-    color: #a1a1aa;
     pointer-events: none;
     font-size: 0.95rem;
+    z-index: 1;
+    color: #a1a1aa;
 }
 
 .rte-modal-backdrop {
@@ -566,80 +678,197 @@ watch(
 }
 
 .rte-modal {
-    background: #ffffff;
     border-radius: 0.75rem;
-    padding: 1rem;
+    padding: 1.5rem;
     width: min(24rem, 90vw);
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 1rem;
+    background-color: #ffffff;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
 }
 
 .rte-modal-title {
-    font-weight: 600;
+    font-weight: 700;
+    font-size: 1.125rem;
+    color: #18181b;
 }
 
 .rte-modal-input {
-    border: 1px solid #d4d4d8;
     border-radius: 0.5rem;
-    padding: 0.5rem 0.75rem;
+    padding: 0.75rem;
     font-size: 0.95rem;
+    border: 1px solid #e4e4e7;
+    background-color: #ffffff;
+}
+
+.rte-modal-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 1px #3b82f6;
 }
 
 .rte-modal-actions {
     display: flex;
     justify-content: flex-end;
-    gap: 0.5rem;
+    gap: 0.75rem;
 }
 
 .rte-modal-button {
-    border: 1px solid #d4d4d8;
-    background: #f4f4f5;
-    padding: 0.35rem 0.8rem;
+    padding: 0.5rem 1rem;
     border-radius: 0.5rem;
     cursor: pointer;
+    border: 1px solid #e4e4e7;
+    background-color: #ffffff;
+    color: #52525b;
+    font-weight: 500;
+    font-size: 0.875rem;
+    transition: all 0.15s ease-in-out;
+}
+
+.rte-modal-button:hover:not(:disabled) {
+    background-color: #fafafa;
+    border-color: #d4d4d8;
 }
 
 .rte-modal-button:disabled {
-    opacity: 0.6;
+    opacity: 0.5;
     cursor: not-allowed;
 }
 
-.rte-prosemirror {
-    min-height: 100%;
+.rte-editor-content :deep(.ProseMirror) {
+    flex: 1;
+    width: 100%;
     padding: 0.75rem;
     outline: none;
-}
-
-div[data-tiptap-editor] {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-}
-
-div[data-tiptap-editor] > div {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-}
-
-.ProseMirror {
-    height: 100%;
-    width: 100%;
-    margin: 0 auto;
-    box-sizing: border-box;
-    flex: 1;
     overflow-y: auto;
+    box-sizing: border-box;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: #27272a;
 }
 
-.ProseMirror > :first-child {
+.rte-editor-content :deep(.ProseMirror) > :first-child {
     margin-top: 0;
 }
 
-.ProseMirror h5 {
+.rte-editor-content :deep(.ProseMirror) h1 {
+    font-size: 2em;
+    font-weight: 700;
+    margin: 0.67em 0;
+    line-height: 1.2;
+    color: #18181b;
+}
+
+.rte-editor-content :deep(.ProseMirror) h2 {
+    font-size: 1.5em;
+    font-weight: 700;
+    margin: 0.75em 0;
+    line-height: 1.3;
+    color: #18181b;
+}
+
+.rte-editor-content :deep(.ProseMirror) h3 {
+    font-size: 1.17em;
+    font-weight: 600;
+    margin: 0.83em 0;
+    line-height: 1.4;
+    color: #18181b;
+}
+
+.rte-editor-content :deep(.ProseMirror) h4 {
+    font-size: 1em;
+    font-weight: 600;
+    margin: 1em 0;
+    line-height: 1.4;
+    color: #18181b;
+}
+
+.rte-editor-content :deep(.ProseMirror) h5 {
     font-size: 0.83em;
     font-weight: 600;
     margin: 0.5rem 0;
     line-height: 1.3;
+    color: #18181b;
+}
+
+.rte-editor-content :deep(.ProseMirror) h6 {
+    font-size: 0.67em;
+    font-weight: 600;
+    margin: 0.5rem 0;
+    line-height: 1.3;
+    color: #18181b;
+}
+
+.rte-editor-content :deep(.ProseMirror) p {
+    margin: 0.5rem 0;
+}
+
+.rte-editor-content :deep(.ProseMirror) strong {
+    font-weight: 700;
+}
+
+.rte-editor-content :deep(.ProseMirror) em {
+    font-style: italic;
+}
+
+.rte-editor-content :deep(.ProseMirror) ul {
+    list-style-type: disc;
+    padding-left: 1.5rem;
+    margin: 0.5rem 0;
+}
+
+.rte-editor-content :deep(.ProseMirror) ol {
+    list-style-type: decimal;
+    padding-left: 1.5rem;
+    margin: 0.5rem 0;
+}
+
+.rte-editor-content :deep(.ProseMirror) li {
+    margin: 0.25rem 0;
+}
+
+.rte-editor-content :deep(.ProseMirror) a {
+    color: #3b82f6;
+    text-decoration: underline;
+    cursor: pointer;
+    transition: color 0.15s ease-in-out;
+}
+
+.rte-editor-content :deep(.ProseMirror) a:hover {
+    color: #2563eb;
+}
+
+.rte-editor-content :deep(.ProseMirror) blockquote {
+    border-left: 4px solid #e4e4e7;
+    padding-left: 1rem;
+    margin: 1rem 0;
+    color: #71717a;
+    font-style: italic;
+}
+
+.rte-editor-content :deep(.ProseMirror) code {
+    background-color: #f4f4f5;
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.25rem;
+    font-family: monospace;
+    font-size: 0.875em;
+}
+
+.rte-editor-content :deep(.ProseMirror) pre {
+    background-color: #27272a;
+    color: #fafafa;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    overflow-x: auto;
+    margin: 1rem 0;
+}
+
+.rte-editor-content :deep(.ProseMirror) pre code {
+    background-color: transparent;
+    color: inherit;
+    padding: 0;
+    border-radius: 0;
+    font-size: 0.875rem;
 }
 </style>

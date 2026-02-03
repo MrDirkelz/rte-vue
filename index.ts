@@ -1,3 +1,3 @@
-export { default as RichTextEditorStandalone } from "./RichTextEditorStandalone.vue";
+export { default as RTextEditor } from "./RTextEditor.vue";
 export { default as formatPastedHtml } from "./formatPastedHtml";
-export type { RichTextEditorProps, ToolbarItem } from "./RichTextEditorStandalone.vue";
+export type { RichTextEditorProps, ToolbarItem, HeadingLevel } from "./RTextEditor.vue";

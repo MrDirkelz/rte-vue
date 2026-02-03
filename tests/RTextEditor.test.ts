@@ -1,6 +1,6 @@
 import { mount } from "@vue/test-utils";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import RichTextEditorStandalone from "../RichTextEditorStandalone.vue";
+import RTextEditor from "../RTextEditor.vue";
 import { __setEditor } from "@tiptap/vue-3";
 
 declare module "@tiptap/vue-3" {
@@ -83,9 +83,9 @@ beforeEach(() => {
     __setEditor(createEditorMock());
 });
 
-describe("RichTextEditorStandalone", () => {
+describe("RTextEditor", () => {
     it("renders the title and toolbar buttons", () => {
-        const wrapper = mount(RichTextEditorStandalone, {
+        const wrapper = mount(RTextEditor, {
             props: {
                 title: "Editor Title",
             },
@@ -100,7 +100,7 @@ describe("RichTextEditorStandalone", () => {
     });
 
     it("hides the toolbar when showToolbar is false", () => {
-        const wrapper = mount(RichTextEditorStandalone, {
+        const wrapper = mount(RTextEditor, {
             props: {
                 showToolbar: false,
             },
@@ -110,7 +110,7 @@ describe("RichTextEditorStandalone", () => {
     });
 
     it("hides the toolbar when disabled", () => {
-        const wrapper = mount(RichTextEditorStandalone, {
+        const wrapper = mount(RTextEditor, {
             props: {
                 disabled: true,
             },
@@ -122,7 +122,7 @@ describe("RichTextEditorStandalone", () => {
     it("shows the placeholder when the editor is empty", () => {
         __setEditor(createEditorMock({ isEmpty: true }));
 
-        const wrapper = mount(RichTextEditorStandalone, {
+        const wrapper = mount(RTextEditor, {
             props: {
                 placeholder: "Start typing...",
             },
@@ -132,7 +132,7 @@ describe("RichTextEditorStandalone", () => {
     });
 
     it("opens the link modal when clicking the link button", async () => {
-        const wrapper = mount(RichTextEditorStandalone);
+        const wrapper = mount(RTextEditor);
 
         const linkButton = wrapper
             .findAll("button")
@@ -145,7 +145,7 @@ describe("RichTextEditorStandalone", () => {
     });
 
     it("disables the unlink button when no link is selected", () => {
-        const wrapper = mount(RichTextEditorStandalone);
+        const wrapper = mount(RTextEditor);
 
         const unlinkButton = wrapper
             .findAll("button")
@@ -155,7 +155,7 @@ describe("RichTextEditorStandalone", () => {
     });
 
     it("supports custom toolbar groups and labels", () => {
-        const wrapper = mount(RichTextEditorStandalone, {
+        const wrapper = mount(RTextEditor, {
             props: {
                 toolbarGroups: [
                     ["bold", "italic"],
@@ -176,7 +176,7 @@ describe("RichTextEditorStandalone", () => {
     });
 
     it("applies custom classNames to the root and toolbar", () => {
-        const wrapper = mount(RichTextEditorStandalone, {
+        const wrapper = mount(RTextEditor, {
             props: {
                 classNames: {
                     root: "custom-root",
@@ -190,13 +190,18 @@ describe("RichTextEditorStandalone", () => {
     });
 
     it("renders a custom toolbar slot with provided props", () => {
-        const wrapper = mount(RichTextEditorStandalone, {
+        const wrapper = mount(RTextEditor, {
+            props: {
+                toolbarItems: ["bold", "italic"],
+                showToolbar: true,
+                disabled: false,
+            },
             slots: {
-                toolbar: ({ items }: { items: string[] }) =>
-                    `<div class="custom-toolbar-slot">Items: ${items.length}</div>`,
+                toolbar: '<div class="custom-toolbar-slot">Custom Toolbar</div>',
             },
         });
 
         expect(wrapper.find(".custom-toolbar-slot").exists()).toBe(true);
+        expect(wrapper.find(".custom-toolbar-slot").text()).toBe("Custom Toolbar");
     });
 });

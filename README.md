@@ -1,9 +1,12 @@
-# RichTextEditorStandalone
+# RTextEditor
 
 A fully configurable rich text editor component built with Vue 3 and TipTap. Designed to be framework-agnostic and ready for npm publication.
 
 ## Features
 
+- ✅ **Zero-Config Usage** – Simple `v-model` without extra setup
+- ✅ **Markdown Support** – Store content as markdown or JSON
+- ✅ **Configurable Headings** – Support H1-H6 with optional level offset
 - ✅ **Configurable Toolbar** – Show/hide toolbar, customize items, groups, and labels
 - ✅ **Custom Styling** – Use Tailwind CSS or raw CSS via the `classNames` prop
 - ✅ **Custom Buttons** – Replace toolbar buttons or entire toolbar with slots
@@ -20,18 +23,33 @@ npm install rich-text-editor-vue-tiptap
 
 ## Usage
 
-### Basic
+### Zero-Config (Recommended)
 
 ```vue
 <script setup>
 import { ref } from "vue";
-import { RichTextEditorStandalone } from "rich-text-editor-vue-tiptap";
+import { RTextEditor } from "rich-text-editor-vue-tiptap";
 
 const content = ref("");
 </script>
 
 <template>
-    <RichTextEditorStandalone
+    <RTextEditor v-model="content" />
+</template>
+```
+
+### Basic
+
+```vue
+<script setup>
+import { ref } from "vue";
+import { RTextEditor } from "rich-text-editor-vue-tiptap";
+
+const content = ref("");
+</script>
+
+<template>
+    <RTextEditor
         v-model:text="content"
         title="Edit Content"
         placeholder="Start typing..."
@@ -44,14 +62,14 @@ const content = ref("");
 ```vue
 <script setup>
 import { ref } from "vue";
-import { RichTextEditorStandalone } from "rich-text-editor-vue-tiptap";
+import { RTextEditor } from "rich-text-editor-vue-tiptap";
 
 const content = ref("");
 const language = ref("en");
 </script>
 
 <template>
-    <RichTextEditorStandalone
+    <RTextEditor
         v-model:text="content"
         v-model:textLanguage="language"
         title="Multilingual Editor"
@@ -63,7 +81,7 @@ const language = ref("en");
 
 ```vue
 <template>
-    <RichTextEditorStandalone
+    <RTextEditor
         v-model:text="content"
         :onChange="(value) => console.log('Text changed:', value)"
         :onSave="(value) => saveContent(value)"
@@ -73,13 +91,83 @@ const language = ref("en");
 </template>
 ```
 
+### Markdown Mode
+
+```vue
+<script setup>
+import { ref } from "vue";
+import { RTextEditor } from "rich-text-editor-vue-tiptap";
+
+const markdown = ref("# Hello World\n\nThis is **markdown**!");
+</script>
+
+<template>
+    <RTextEditor v-model="markdown" contentFormat="markdown" />
+</template>
+```
+
+### With Heading Offset
+
+```vue
+<script setup>
+import { ref } from "vue";
+import { RTextEditor } from "rich-text-editor-vue-tiptap";
+
+const content = ref("");
+</script>
+
+<template>
+    <!-- H1 in toolbar becomes H2 in content (for blog posts where H1 is the title) -->
+    <RTextEditor
+        v-model="content"
+        :headingOffset="1"
+        :toolbarItems="['heading1', 'heading2', 'heading3', 'bold', 'italic']"
+    />
+</template>
+```
+
 ## Props
+
+### `modelValue` (v-model)
+
+Type: `string` | Default: `""`
+
+The editor content. Format depends on `contentFormat` prop (JSON or Markdown). This is the recommended way to bind content.
+
+```vue
+<RTextEditor v-model="content" />
+```
 
 ### `text` (v-model)
 
 Type: `string` | Default: `""`
 
-The editor content as JSON string. Updated via v-model.
+Alternative to `modelValue` for backward compatibility. The editor content as JSON or Markdown string.
+
+### `contentFormat`
+
+Type: `"json" | "markdown"` | Default: `"json"`
+
+Determines how content is stored and emitted:
+- `"json"` – TipTap JSON format (default)
+- `"markdown"` – Markdown format
+
+```vue
+<RTextEditor v-model="content" contentFormat="markdown" />
+```
+
+### `headingOffset`
+
+Type: `number` | Default: `0`
+
+Offset for heading levels. Useful when H1 is reserved for page titles:
+- `0` – No offset (H1 button creates H1)
+- `1` – Increment by 1 (H1 button creates H2, H2 button creates H3, etc.)
+- `2` – Increment by 2 (H1 button creates H3, etc.)
+
+```vue
+<RTextEditor v-model="content" :headingOffset="1" />
+```
 
 ### `textLanguage` (v-model)
 
@@ -126,10 +214,12 @@ Which toolbar items to display. Options:
 - `"bold"` – Bold text
 - `"italic"` – Italic text
 - `"strike"` – Strikethrough
-- `"heading2"` – Heading level 2
-- `"heading3"` – Heading level 3
-- `"heading4"` – Heading level 4
-- `"heading5"` – Heading level 5
+- `"heading1"` – Heading level 1 (+ offset)
+- `"heading2"` – Heading level 2 (+ offset)
+- `"heading3"` – Heading level 3 (+ offset)
+- `"heading4"` – Heading level 4 (+ offset)
+- `"heading5"` – Heading level 5 (+ offset)
+- `"heading6"` – Heading level 6 (+ offset)
 - `"bulletList"` – Bullet list
 - `"orderedList"` – Ordered list
 - `"link"` – Add/edit link
@@ -142,7 +232,7 @@ Type: `ToolbarItem[][]` | Default: `[toolbarItems]`
 Organize toolbar items into grouped rows.
 
 ```vue
-<RichTextEditorStandalone
+<RTextEditor
     :toolbarGroups="[
         ['bold', 'italic', 'strike'],
         ['heading2', 'heading3', 'heading4'],
@@ -159,7 +249,7 @@ Type: `Partial<Record<ToolbarItem, string>>` | Default: `{}`
 Custom labels for toolbar buttons.
 
 ```vue
-<RichTextEditorStandalone
+<RTextEditor
     :toolbarLabels="{
         bold: 'Strong',
         italic: 'Emphasis',
@@ -194,7 +284,7 @@ Apply custom CSS classes or Tailwind utilities to any element. All classNames ar
 - `modalButton` – Modal button
 
 ```vue
-<RichTextEditorStandalone
+<RTextEditor
     :classNames="{
         root: 'h-full shadow-lg',
         editor: 'border-2 border-blue-500',
@@ -212,7 +302,7 @@ Type: `string` | Default: `undefined`
 Inline CSS height/width (e.g., `"200px"`, `"50vh"`).
 
 ```vue
-<RichTextEditorStandalone minHeight="300px" maxHeight="500px" width="100%" />
+<RTextEditor minHeight="300px" maxHeight="500px" width="100%" />
 ```
 
 ### `onChange`
@@ -251,7 +341,7 @@ import { formatPastedHtml } from "rich-text-editor-vue-tiptap";
 </script>
 
 <template>
-    <RichTextEditorStandalone :transformPastedHtml="formatPastedHtml" />
+    <RTextEditor :transformPastedHtml="formatPastedHtml" />
 </template>
 ```
 
@@ -271,7 +361,7 @@ Override the entire toolbar layout.
 - `runCommand(item)` – Execute toolbar action
 
 ```vue
-<RichTextEditorStandalone v-model:text="content">
+<RTextEditor v-model:text="content">
   <template #toolbar="{ getLabel, runCommand, isActive }">
     <div class="flex gap-1">
       <button
@@ -284,7 +374,7 @@ Override the entire toolbar layout.
       </button>
     </div>
   </template>
-</RichTextEditorStandalone>
+</RTextEditor>
 ```
 
 ### `#toolbar-button`
@@ -300,7 +390,7 @@ Override individual toolbar buttons.
 - `runCommand` – `(item) => void` – Execute action
 
 ```vue
-<RichTextEditorStandalone v-model:text="content">
+<RTextEditor v-model:text="content">
   <template #toolbar-button="{ item, label, active, disabled, runCommand }">
     <button
       :class="[
@@ -315,7 +405,7 @@ Override individual toolbar buttons.
       {{ label }}
     </button>
   </template>
-</RichTextEditorStandalone>
+</RTextEditor>
 ```
 
 ## Examples
@@ -323,13 +413,13 @@ Override individual toolbar buttons.
 ### Minimal (No Toolbar)
 
 ```vue
-<RichTextEditorStandalone v-model:text="content" :showToolbar="false" />
+<RTextEditor v-model:text="content" :showToolbar="false" />
 ```
 
 ### With Tailwind Styling
 
 ```vue
-<RichTextEditorStandalone
+<RTextEditor
     v-model:text="content"
     title="Rich Text"
     :classNames="{
@@ -345,7 +435,7 @@ Override individual toolbar buttons.
 ### With Custom Toolbar
 
 ```vue
-<RichTextEditorStandalone v-model:text="content">
+<RTextEditor v-model:text="content">
   <template #toolbar="{ runCommand }">
     <div class="toolbar-custom flex gap-4 p-2">
       <button @click="runCommand('bold')" class="btn">B</button>
@@ -354,7 +444,7 @@ Override individual toolbar buttons.
       <button @click="runCommand('link')" class="btn">Link</button>
     </div>
   </template>
-</RichTextEditorStandalone>
+</RTextEditor>
 
 <style>
 .btn {
@@ -375,7 +465,7 @@ Override individual toolbar buttons.
 ```vue
 <script setup>
 import { ref } from "vue";
-import { RichTextEditorStandalone, formatPastedHtml } from "rich-text-editor-vue-tiptap";
+import { RTextEditor, formatPastedHtml } from "rich-text-editor-vue-tiptap";
 
 const content = ref("");
 
@@ -386,7 +476,7 @@ const handleSave = (value) => {
 </script>
 
 <template>
-    <RichTextEditorStandalone
+    <RTextEditor
         v-model:text="content"
         :transformPastedHtml="formatPastedHtml"
         :onSave="handleSave"
