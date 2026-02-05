@@ -1,485 +1,183 @@
-# RTextEditor
+# rte-vue
 
-A fully configurable rich text editor component built with Vue 3 and TipTap. Designed to be framework-agnostic and ready for npm publication.
+<p align="left">
+  <a href="https://www.npmjs.com/package/rte-vue"><img src="https://img.shields.io/npm/v/rte-vue?style=flat-square&color=blue" alt="npm version" /></a>
+  <img src="https://img.shields.io/npm/l/rte-vue?style=flat-square&color=green" alt="license" />
+  <img src="https://img.shields.io/badge/vue-3.x-42b883?style=flat-square&logo=vue.js" alt="vue version" />
+  <img src="https://img.shields.io/badge/typescript-ready-blue?style=flat-square&logo=typescript" alt="typescript" />
+</p>
 
-## Features
+A **fully configurable**, **ready-to-use** Rich Text Editor for Vue 3.
+Built on [TiPTap](https://tiptap.dev/), this editor provides a seamless WYSIWYG experience with Markdown support, customization slots, and zero-config usage.
 
-- ✅ **Zero-Config Usage** – Simple `v-model` without extra setup
-- ✅ **Markdown Support** – Store content as markdown or JSON
-- ✅ **Configurable Headings** – Support H1-H6 with optional level offset
-- ✅ **Configurable Toolbar** – Show/hide toolbar, customize items, groups, and labels
-- ✅ **Custom Styling** – Use Tailwind CSS or raw CSS via the `classNames` prop
-- ✅ **Custom Buttons** – Replace toolbar buttons or entire toolbar with slots
-- ✅ **HTML Paste Transform** – Hook into paste behavior with `transformPastedHtml`
-- ✅ **Events** – `onChange`, `onSave`, `onFocus`, `onBlur` callbacks
-- ✅ **v-model Support** – Two-way binding for text and language
-- ✅ **TypeScript Ready** – Full type exports
+Perfect for blogs, CMS, comment sections, or any Vue 3 app needing text editing.
 
-## Installation
+## ✨ Features
+
+- 🚀 **Zero-Config**: Just drop it in and it works with `v-model`.
+- 📝 **Markdown & JSON**: Native support for Markdown input/output (or use JSON).
+- 🎨 **Component-Scoped Styles**: Looks good out of the box, but easily overridable.
+- 🔧 **Highly Customizable**:
+  - Configure toolbar items and groups.
+  - Override specific buttons or the entire toolbar via **Slots**.
+  - Custom styling for every element.
+- 🧱 **Block Styling**: Headings, lists, links, bold, italic, strike-through out of the box.
+- 🦾 **TypeScript**: Full TypeScript support with exported types.
+
+## � Examples
+
+Check out the [**examples**](./examples/README.md) folder for detailed usage scenarios, including:
+
+1. [Basic Usage](./examples/README.md#1-basic-usage)
+2. [Custom Toolbar Groups](./examples/README.md#2-custom-toolbar-groups)
+3. [Theming with Tailwind CSS](./examples/README.md#3-theming-with-tailwind-css)
+4. [Markdown Support](./examples/README.md#4-markdown-support)
+5. [Custom Toolbar Buttons (Slots)](./examples/README.md#5-custom-toolbar-buttons-slots)
+6. [Form Validation Integration](./examples/README.md#6-form-validation-integration)7. [Internationalization (i18n)](./examples/README.md#7-internationalization-i18n)
+8. [Read-Only Display](./examples/README.md#8-read-only-display)
+9. [Chat / Comment Input](./examples/README.md#9-chat--comment-input)
+10. [Programmatic Control](./examples/README.md#10-programmatic-control)
+## �📦 Installation
 
 ```bash
-npm install rich-text-editor-vue-tiptap
+npm install rte-vue
 ```
 
-## Usage
+## ⚡ Quick Start
 
-### Zero-Config (Recommended)
+### The "It Just Works" Way
 
 ```vue
-<script setup>
-import { ref } from "vue";
-import { RTextEditor } from "rich-text-editor-vue-tiptap";
+<script setup lang="ts">
+import { ref } from 'vue';
+import { RTextEditor } from 'rte-vue';
+import 'rte-vue/dist/style.css'; 
 
-const content = ref("");
+const content = ref('# Hello World');
 </script>
 
 <template>
-    <RTextEditor v-model="content" />
+  <RTextEditor v-model="content" />
 </template>
 ```
 
-### Basic
+### Full Configuration Example
 
 ```vue
-<script setup>
-import { ref } from "vue";
-import { RTextEditor } from "rich-text-editor-vue-tiptap";
-
-const content = ref("");
-</script>
-
-<template>
-    <RTextEditor
-        v-model:text="content"
-        title="Edit Content"
-        placeholder="Start typing..."
-    />
-</template>
-```
-
-### With Language Support
-
-```vue
-<script setup>
-import { ref } from "vue";
-import { RTextEditor } from "rich-text-editor-vue-tiptap";
-
-const content = ref("");
-const language = ref("en");
-</script>
-
-<template>
-    <RTextEditor
-        v-model:text="content"
-        v-model:textLanguage="language"
-        title="Multilingual Editor"
-    />
-</template>
-```
-
-### With Event Handlers
-
-```vue
-<template>
-    <RTextEditor
-        v-model:text="content"
-        :onChange="(value) => console.log('Text changed:', value)"
-        :onSave="(value) => saveContent(value)"
-        :onFocus="() => console.log('Editor focused')"
-        :onBlur="() => console.log('Editor blurred')"
-    />
-</template>
-```
-
-### Markdown Mode
-
-```vue
-<script setup>
-import { ref } from "vue";
-import { RTextEditor } from "rich-text-editor-vue-tiptap";
-
-const markdown = ref("# Hello World\n\nThis is **markdown**!");
-</script>
-
-<template>
-    <RTextEditor v-model="markdown" contentFormat="markdown" />
-</template>
-```
-
-### With Heading Offset
-
-```vue
-<script setup>
-import { ref } from "vue";
-import { RTextEditor } from "rich-text-editor-vue-tiptap";
-
-const content = ref("");
-</script>
-
-<template>
-    <!-- H1 in toolbar becomes H2 in content (for blog posts where H1 is the title) -->
-    <RTextEditor
-        v-model="content"
-        :headingOffset="1"
-        :toolbarItems="['heading1', 'heading2', 'heading3', 'bold', 'italic']"
-    />
-</template>
-```
-
-## Props
-
-### `modelValue` (v-model)
-
-Type: `string` | Default: `""`
-
-The editor content. Format depends on `contentFormat` prop (JSON or Markdown). This is the recommended way to bind content.
-
-```vue
-<RTextEditor v-model="content" />
-```
-
-### `text` (v-model)
-
-Type: `string` | Default: `""`
-
-Alternative to `modelValue` for backward compatibility. The editor content as JSON or Markdown string.
-
-### `contentFormat`
-
-Type: `"json" | "markdown"` | Default: `"json"`
-
-Determines how content is stored and emitted:
-- `"json"` – TipTap JSON format (default)
-- `"markdown"` – Markdown format
-
-```vue
-<RTextEditor v-model="content" contentFormat="markdown" />
-```
-
-### `headingOffset`
-
-Type: `number` | Default: `0`
-
-Offset for heading levels. Useful when H1 is reserved for page titles:
-- `0` – No offset (H1 button creates H1)
-- `1` – Increment by 1 (H1 button creates H2, H2 button creates H3, etc.)
-- `2` – Increment by 2 (H1 button creates H3, etc.)
-
-```vue
-<RTextEditor v-model="content" :headingOffset="1" />
-```
-
-### `textLanguage` (v-model)
-
-Type: `string | undefined` | Default: `undefined`
-
-Current language context. Update content when language changes.
-
-### `title`
-
-Type: `string | undefined` | Default: `undefined`
-
-Header title displayed above the editor.
-
-### `icon`
-
-Type: `Component | undefined` | Default: `undefined`
-
-Vue component to render as icon next to title.
-
-### `disabled`
-
-Type: `boolean` | Default: `false`
-
-Disables editor and hides toolbar.
-
-### `showToolbar`
-
-Type: `boolean` | Default: `true`
-
-Show or hide the toolbar entirely.
-
-### `placeholder`
-
-Type: `string | undefined` | Default: `undefined`
-
-Placeholder text when editor is empty.
-
-### `toolbarItems`
-
-Type: `ToolbarItem[]` | Default: `[all items]`
-
-Which toolbar items to display. Options:
-
-- `"bold"` – Bold text
-- `"italic"` – Italic text
-- `"strike"` – Strikethrough
-- `"heading1"` – Heading level 1 (+ offset)
-- `"heading2"` – Heading level 2 (+ offset)
-- `"heading3"` – Heading level 3 (+ offset)
-- `"heading4"` – Heading level 4 (+ offset)
-- `"heading5"` – Heading level 5 (+ offset)
-- `"heading6"` – Heading level 6 (+ offset)
-- `"bulletList"` – Bullet list
-- `"orderedList"` – Ordered list
-- `"link"` – Add/edit link
-- `"unlink"` – Remove link
-
-### `toolbarGroups`
-
-Type: `ToolbarItem[][]` | Default: `[toolbarItems]`
-
-Organize toolbar items into grouped rows.
-
-```vue
-<RTextEditor
-    :toolbarGroups="[
-        ['bold', 'italic', 'strike'],
-        ['heading2', 'heading3', 'heading4'],
-        ['bulletList', 'orderedList'],
-        ['link', 'unlink'],
-    ]"
-/>
-```
-
-### `toolbarLabels`
-
-Type: `Partial<Record<ToolbarItem, string>>` | Default: `{}`
-
-Custom labels for toolbar buttons.
-
-```vue
-<RTextEditor
-    :toolbarLabels="{
-        bold: 'Strong',
-        italic: 'Emphasis',
-    }"
-/>
-```
-
-### `classNames`
-
-Type: `object` | Default: `{}`
-
-Apply custom CSS classes or Tailwind utilities to any element. All classNames are merged with defaults.
-
-**Available classNames:**
-
-- `root` – Root container
-- `header` – Title/icon header
-- `title` – Title text
-- `icon` – Icon element
-- `toolbar` – Toolbar container
-- `toolbarGroup` – Button group container
-- `button` – Toolbar button
-- `buttonActive` – Active button state (merged with `button`)
-- `editor` – Editor wrapper
-- `editorContent` – ProseMirror editor content container
-- `placeholder` – Placeholder text
-- `modalBackdrop` – Link modal backdrop
-- `modal` – Link modal dialog
-- `modalTitle` – Modal title
-- `modalInput` – Modal URL input
-- `modalActions` – Modal footer actions
-- `modalButton` – Modal button
-
-```vue
-<RTextEditor
-    :classNames="{
-        root: 'h-full shadow-lg',
-        editor: 'border-2 border-blue-500',
-        button: 'px-3 py-2 rounded hover:bg-gray-200',
-        buttonActive: 'bg-blue-500 text-white',
-        placeholder: 'text-gray-400 italic',
-    }"
-/>
-```
-
-### `minHeight` / `maxHeight` / `width`
-
-Type: `string` | Default: `undefined`
-
-Inline CSS height/width (e.g., `"200px"`, `"50vh"`).
-
-```vue
-<RTextEditor minHeight="300px" maxHeight="500px" width="100%" />
-```
-
-### `onChange`
-
-Type: `(value: string) => void` | Default: `undefined`
-
-Callback fired on every text change.
-
-### `onSave`
-
-Type: `(value: string) => void` | Default: `undefined`
-
-Callback fired when Cmd/Ctrl+S is pressed.
-
-### `onFocus`
-
-Type: `() => void` | Default: `undefined`
-
-Callback fired when editor gains focus.
-
-### `onBlur`
-
-Type: `() => void` | Default: `undefined`
-
-Callback fired when editor loses focus.
-
-### `transformPastedHtml`
-
-Type: `(html: string) => string` | Default: `formatPastedHtml`
-
-Hook to transform HTML before pasting into editor. Useful for cleaning up Microsoft Word formatting.
-
-```vue
-<script setup>
-import { formatPastedHtml } from "rich-text-editor-vue-tiptap";
-</script>
-
-<template>
-    <RTextEditor :transformPastedHtml="formatPastedHtml" />
-</template>
-```
-
-## Slots
-
-### `#toolbar`
-
-Override the entire toolbar layout.
-
-**Slot Props:**
-
-- `items` – `ToolbarItem[]` – All toolbar items
-- `groups` – `ToolbarItem[][]` – Grouped items
-- `isActive(item)` – Check if button is active
-- `isDisabled(item)` – Check if button is disabled
-- `getLabel(item)` – Get button label
-- `runCommand(item)` – Execute toolbar action
-
-```vue
-<RTextEditor v-model:text="content">
-  <template #toolbar="{ getLabel, runCommand, isActive }">
-    <div class="flex gap-1">
-      <button
-        v-for="item in ['bold', 'italic', 'strike']"
-        :key="item"
-        :class="{ 'font-bold': isActive(item) }"
-        @click="runCommand(item)"
-      >
-        {{ getLabel(item) }}
-      </button>
-    </div>
-  </template>
-</RTextEditor>
-```
-
-### `#toolbar-button`
-
-Override individual toolbar buttons.
-
-**Slot Props:**
-
-- `item` – `ToolbarItem` – Button identifier
-- `label` – `string` – Button label
-- `active` – `boolean` – Is button active
-- `disabled` – `boolean` – Is button disabled
-- `runCommand` – `(item) => void` – Execute action
-
-```vue
-<RTextEditor v-model:text="content">
-  <template #toolbar-button="{ item, label, active, disabled, runCommand }">
-    <button
-      :class="[
-        'px-3 py-1.5 rounded transition',
-        active
-          ? 'bg-indigo-600 text-white'
-          : 'bg-gray-100 hover:bg-gray-200'
-      ]"
-      :disabled="disabled"
-      @click="runCommand(item)"
-    >
-      {{ label }}
-    </button>
-  </template>
-</RTextEditor>
-```
-
-## Examples
-
-### Minimal (No Toolbar)
-
-```vue
-<RTextEditor v-model:text="content" :showToolbar="false" />
-```
-
-### With Tailwind Styling
-
-```vue
-<RTextEditor
-    v-model:text="content"
-    title="Rich Text"
-    :classNames="{
-        root: 'rounded-lg shadow-md border border-gray-300',
-        editor: 'bg-white focus-within:border-blue-500',
-        button: 'text-sm rounded px-2 py-1 hover:bg-gray-200',
-        buttonActive: 'bg-blue-500 text-white',
-        placeholder: 'text-gray-400',
-    }"
-/>
-```
-
-### With Custom Toolbar
-
-```vue
-<RTextEditor v-model:text="content">
-  <template #toolbar="{ runCommand }">
-    <div class="toolbar-custom flex gap-4 p-2">
-      <button @click="runCommand('bold')" class="btn">B</button>
-      <button @click="runCommand('italic')" class="btn">I</button>
-      <button @click="runCommand('heading2')" class="btn">H2</button>
-      <button @click="runCommand('link')" class="btn">Link</button>
-    </div>
-  </template>
-</RTextEditor>
-
-<style>
-.btn {
-    padding: 0.5rem 1rem;
-    border: 1px solid #ccc;
-    border-radius: 0.375rem;
-    cursor: pointer;
-}
-
-.btn:hover {
-    background-color: #f0f0f0;
-}
-</style>
-```
-
-### With Transform & Handlers
-
-```vue
-<script setup>
-import { ref } from "vue";
-import { RTextEditor, formatPastedHtml } from "rich-text-editor-vue-tiptap";
-
-const content = ref("");
-
-const handleSave = (value) => {
-    console.log("Saving:", value);
-    // API call
+<script setup lang="ts">
+import { ref } from 'vue';
+import { RTextEditor } from 'rte-vue';
+import 'rte-vue/dist/style.css';
+
+const myContent = ref('');
+
+const handleSave = (content: string) => {
+  console.log('Saved content:', content);
 };
 </script>
 
 <template>
-    <RTextEditor
-        v-model:text="content"
-        :transformPastedHtml="formatPastedHtml"
-        :onSave="handleSave"
-    />
+  <RTextEditor
+    v-model="myContent"
+    placeholder="Write something amazing..."
+    content-format="markdown"
+    :heading-offset="1"
+    :toolbar-items="['bold', 'italic', 'heading2', 'bulletList', 'link']"
+    @save="handleSave"
+  />
 </template>
 ```
+
+## 📖 Component API
+
+### Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `modelValue` / `text` | `string` | `""` | The content of the editor. Supports `v-model`. |
+| `contentFormat` | `'json' \| 'markdown'` | `'json'` | Format for input and output strings. |
+| `showToolbar` | `boolean` | `true` | Visibility of the toolbar. |
+| `disabled` | `boolean` | `false` | Disables editing. |
+| `placeholder` | `string` | - | Placeholder text when empty. |
+| `headingOffset` | `number` | `0` | Offsets heading levels (e.g., +1 makes H1 render as H2). |
+| `toolbarItems` | `ToolbarItem[]` | `['bold', ...]` | Array of button keys to show. |
+| `toolbarGroups` | `ToolbarItem[][]` | - | Advanced: Group buttons into visual clusters. |
+| `toolbarLabels` | `Record<string, string>` | - | Custom labels/tooltips for buttons. |
+| `classNames` | `object` | - | Object of class strings for `root`, `editor`, `button`, etc. |
+| `minHeight` | `string` | - | CSS min-height (e.g., '200px'). |
+| `maxHeight` | `string` | - | CSS max-height. |
+| `width` | `string` | - | CSS width. |
+
+### Events
+
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `update:modelValue` | `string` | Emitted on every change (v-model). |
+| `change` | `string` | Emitted on every change. |
+| `save` | `string` | Emitted when user presses `Cmd+S` or `Ctrl+S`. |
+| `focus` | - | Emitted when editor gains focus. |
+| `blur` | - | Emitted when editor loses focus. |
+
+### Slots
+
+#### `#toolbar`
+Completely replace the toolbar area.
+**Scope**: `{ items, groups, isActive(item), isDisabled(item), runCommand(item) }`
+
+#### `#toolbar-button`
+Customize individual buttons while keeping the default layout.
+**Scope**: `{ item, label, active, disabled, runCommand }`
+
+## 🖌️ Styling
+
+The editor comes with minimalist base styles. You can override specific parts using the `classNames` prop or standard CSS.
+
+### Using Utility Classes (Tailwind, UnoCSS, etc)
+Because the default styles use the `:where()` selector (zero specificity), you can pass utility classes directly to the component via the `classNames` prop and they will work immediately without `!important`.
+
+```vue
+<RTextEditor
+  :class-names="{
+    editorContent: 'bg-zinc-50 border-2 border-red-500 rounded-xl',
+    toolbar: 'bg-transparent border-b-0',
+    buttonActive: 'bg-blue-100 text-blue-700'
+  }"
+/>
+```
+
+### CSS Classes & Selectors
+If you prefer writing custom CSS, you can target the following stable class names. 
+
+| Class Name | Description |
+|------------|-------------|
+| `.rte-root` | The top-level container element. |
+| `.rte-header` | The header row containing the icon and title. |
+| `.rte-title` | The header title text. |
+| `.rte-icon` | The header icon svg. |
+| `.rte-toolbar` | The Flex container for the toolbar area. |
+| `.rte-toolbar-group` | The container for a group of related buttons. |
+| `.rte-button` | The toolbar button element. |
+| `.rte-button-active` | The active state of a toolbar button. |
+| `.rte-editor` | The wrapper around the editor content area. |
+| `.rte-editor-content` | The actual editable area (TipTap/ProseMirror container). |
+| `.rte-placeholder` | The absolute positioned placeholder text. |
+
+Since all defaults use `:where(.classname)`, your custom CSS will always win as long as it has a specificity greater than 0 (which is basically any class selector).
+
+```css
+/* No !important needed! */
+.rte-editor-content {
+  background-color: #fdf2f8; 
+  border-radius: 12px;
+}
+```
+
+## ⌨️ Shortcuts
+
+- **Bold**: `Cmd/Ctrl + B`
+- **Italic**: `Cmd/Ctrl + I`
+- **Save**: `Cmd/Ctrl + S`
+
+## License
+
+MIT

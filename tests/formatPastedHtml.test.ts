@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import formatPastedHtml from "../formatPastedHtml";
+import formatPastedHtml from "../src/utils/formatPastedHtml";
 
 describe("formatPastedHtml", () => {
     it("trims whitespace and removes empty paragraphs", () => {

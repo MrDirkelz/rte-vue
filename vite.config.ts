@@ -13,13 +13,13 @@ export default defineConfig({
     plugins: [
         vue(),
         dts({
-            entryRoot: ".",
-            include: ["index.ts", "RTextEditor.vue", "formatPastedHtml.ts"],
+            entryRoot: "src",
+            include: ["src"],
         }),
     ],
     build: {
         lib: {
-            entry: "index.ts",
+            entry: "src/index.ts",
             name: "RTextEditor",
             formats: ["es", "cjs"],
             fileName: (format) => (format === "es" ? "index.js" : "index.cjs"),

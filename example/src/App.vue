@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { RTextEditor } from 'rte-vue'
+import type { ToolbarItem } from 'rte-vue'
 
 // Default style
 const defaultContent = ref('')
@@ -10,6 +11,15 @@ const withToolbar = ref('')
 
 // Without toolbar
 const withoutToolbar = ref('')
+
+// Toolbar grouped example
+const groupedContent = ref('')
+const myToolbarGroups: ToolbarItem[][] = [
+  ['bold', 'italic', 'strike'],
+  ['heading1', 'heading2', 'heading3', 'heading4', 'heading5', 'heading6'],
+  ['bulletList', 'orderedList'],
+  ['link', 'unlink']
+]
 </script>
 
 <template>
@@ -30,7 +40,7 @@ const withoutToolbar = ref('')
         <h2 class="text-2xl font-bold text-gray-900 mb-4">
           Default Style
         </h2>
-        <RTextEditor
+        <RTextEditor``
           v-model="defaultContent"
           placeholder="Start typing..."
           minHeight="300px"
@@ -53,6 +63,19 @@ const withoutToolbar = ref('')
             editor: 'bg-white',
             placeholder: 'text-gray-400'
           }"
+          minHeight="300px"
+        />
+      </div>
+
+      <!-- Toolbar Groups (All Features) -->
+      <div class="bg-white rounded-lg shadow-lg p-6">
+        <h2 class="text-2xl font-bold text-gray-900 mb-4">
+          Toolbar Groups (All Features)
+        </h2>
+        <RTextEditor
+          v-model="groupedContent"
+          :toolbarGroups="myToolbarGroups"
+          placeholder="Editor with grouped toolbar items..."
           minHeight="300px"
         />
       </div>

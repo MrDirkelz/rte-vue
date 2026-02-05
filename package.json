@@ -1,7 +1,31 @@
 {
     "name": "rte-vue",
-    "version": "0.1.5",
-    "description": "Rich text editor component built with Vue 3 and TipTap.",
+    "version": "0.1.7",
+    "description": "A fully configurable, highly intuitive rich text editor component for Vue 3. Built with TipTap and TypeScript, supporting Markdown and JSON output.",
+    "keywords": [
+        "vue",
+        "vue3",
+        "rich-text-editor",
+        "wysiwyg",
+        "tiptap",
+        "markdown-editor",
+        "html-editor",
+        "editor",
+        "input",
+        "component",
+        "typescript",
+        "vue-component"
+    ],
+    "author": "DirkDevelopmentFreelance",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/DirkDevelopmentFreelance/dirk-rte-vue"
+    },
+    "homepage": "https://github.com/DirkDevelopmentFreelance/dirk-rte-vue#readme",
+    "bugs": {
+        "url": "https://github.com/DirkDevelopmentFreelance/dirk-rte-vue/issues"
+    },
     "type": "module",
     "main": "dist/index.cjs",
     "module": "dist/index.js",
@@ -47,10 +71,10 @@
         }
     },
     "dependencies": {
-        "@tiptap/core": "^2.5.0",
-        "@tiptap/extension-link": "^2.5.0",
-        "@tiptap/starter-kit": "^2.5.0",
-        "@tiptap/vue-3": "^2.5.0",
+        "@tiptap/core": "^2.5.0 || ^3.0.0",
+        "@tiptap/extension-link": "^2.5.0 || ^3.0.0",
+        "@tiptap/starter-kit": "^2.5.0 || ^3.0.0",
+        "@tiptap/vue-3": "^2.5.0 || ^3.0.0",
         "markdown-it": "^14.0.0",
         "turndown": "^7.1.0"
     },
@@ -68,7 +92,8 @@
         "vite-plugin-dts": "^3.6.0",
         "vitest": "^1.2.2",
         "vue": "^3.3.0",
-        "vue-tsc": "^1.8.0"
+        "vue-tsc": "^3.2.4",
+        "wait-for-expect": "^4.0.0"
     },
     "license": "MIT"
 }

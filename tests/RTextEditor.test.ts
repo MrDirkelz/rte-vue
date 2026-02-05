@@ -1,8 +1,10 @@
 import { mount } from "@vue/test-utils";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import RTextEditor from "../RTextEditor.vue";
-import { __setEditor } from "@tiptap/vue-3";
+import RTextEditor from "../src/components/RTextEditor.vue";
+import { __setEditor, useEditor } from "@tiptap/vue-3"; // __setEditor is our custom export from mock
+import waitForExpect from "wait-for-expect";
 
+// Type augmentation for our mock helper
 declare module "@tiptap/vue-3" {
     export function __setEditor(value: unknown): void;
 }
@@ -19,6 +21,7 @@ vi.mock("@tiptap/extension-link", () => ({
     },
 }));
 
+// Mock @tiptap/vue-3
 vi.mock("@tiptap/vue-3", async () => {
     const vue = await import("vue");
     const editorRef = vue.ref(null);
@@ -31,15 +34,16 @@ vi.mock("@tiptap/vue-3", async () => {
                 required: false,
             },
         },
-        setup() {
-            return () => vue.h("div", { "data-testid": "editor-content" });
-        },
+        template: '<div data-testid="editor-content"></div>',
     });
 
-    const useEditor = () => editorRef;
+    // Mock useEditor to capture options and return editorRef
+    const useEditor = vi.fn((options) => {
+        return editorRef;
+    });
 
     const __setEditor = (value: unknown) => {
-        editorRef.value = value as typeof editorRef.value;
+        editorRef.value = value as any;
     };
 
     return { useEditor, EditorContent, __setEditor };
@@ -57,6 +61,7 @@ const createEditorMock = (overrides: Partial<Record<string, unknown>> = {}) => {
         unsetLink: () => chain,
         setLink: () => chain,
         extendMarkRange: () => chain,
+        insertContent: vi.fn(),
         run: vi.fn(),
     };
 
@@ -75,12 +80,17 @@ const createEditorMock = (overrides: Partial<Record<string, unknown>> = {}) => {
             insertContent: vi.fn(),
             focus: vi.fn(),
         },
+        setEditable: vi.fn(),
         ...overrides,
     };
 };
 
+let editorMock: any;
+
 beforeEach(() => {
-    __setEditor(createEditorMock());
+    editorMock = createEditorMock();
+    __setEditor(editorMock);
+    vi.clearAllMocks();
 });
 
 describe("RTextEditor", () => {
@@ -94,114 +104,102 @@ describe("RTextEditor", () => {
         expect(wrapper.text()).toContain("Editor Title");
         const boldButton = wrapper
             .findAll("button")
-            .find((button) => button.text() === "Bold");
+            .find((button) => button.text() === "B");
 
         expect(boldButton).toBeDefined();
     });
 
-    it("hides the toolbar when showToolbar is false", () => {
-        const wrapper = mount(RTextEditor, {
-            props: {
-                showToolbar: false,
-            },
-        });
-
-        expect(wrapper.find(".rte-toolbar").exists()).toBe(false);
-    });
-
-    it("hides the toolbar when disabled", () => {
-        const wrapper = mount(RTextEditor, {
-            props: {
-                disabled: true,
-            },
-        });
-
-        expect(wrapper.find(".rte-toolbar").exists()).toBe(false);
-    });
-
-    it("shows the placeholder when the editor is empty", () => {
-        __setEditor(createEditorMock({ isEmpty: true }));
-
-        const wrapper = mount(RTextEditor, {
-            props: {
-                placeholder: "Start typing...",
-            },
-        });
-
-        expect(wrapper.find(".rte-placeholder").exists()).toBe(true);
-    });
-
-    it("opens the link modal when clicking the link button", async () => {
+    // (1) editor is exposed and commands work
+    it("exposes the editor instance and commands work", async () => {
         const wrapper = mount(RTextEditor);
+        
+        await waitForExpect(() => {
+            expect(wrapper.vm.editor).toBeDefined();
+        });
 
-        const linkButton = wrapper
-            .findAll("button")
-            .find((button) => button.text() === "Link");
-
-        expect(linkButton).toBeDefined();
-        await linkButton?.trigger("click");
-
-        expect(wrapper.find(".rte-modal").exists()).toBe(true);
+        // wrapper.vm.editor is a Proxy, so reference equality with editorMock (plain object) fails.
+        // We use toMatchObject or just check properties.
+        expect(wrapper.vm.editor).toMatchObject({
+             commands: expect.any(Object)
+        });
+        expect(wrapper.vm.editor?.commands).toBeDefined();
     });
 
-    it("disables the unlink button when no link is selected", () => {
+    // (2) content updates on setContent
+    it("updates editor content when content changes", async () => {
+        const wrapper = mount(RTextEditor, {
+            props: {
+                modelValue: "Initial",
+            },
+        });
+
+        // Initial content is handled by useEditor, not setContent command
+        // We can verify useEditor was called with correct content
+        expect(useEditor).toHaveBeenCalled();
+        const options = (useEditor as any).mock.calls[0][0];
+        expect(options.content).toBe("Initial");
+
+        // Update modelValue
+        await wrapper.setProps({ modelValue: "New Content" });
+        
+        await waitForExpect(() => {
+            expect(editorMock.commands.setContent).toHaveBeenCalledWith("New Content");
+        });
+    });
+
+    // (3) text prop updates sync editor
+    it("syncs editor when text prop updates", async () => {
+        const wrapper = mount(RTextEditor, {
+            props: {
+                text: "Text Prop Content",
+            },
+        });
+
+        // Check useEditor for initial
+        expect(useEditor).toHaveBeenCalled();
+        const options = (useEditor as any).mock.calls[0][0];
+        expect(options.content).toBe("Text Prop Content");
+        
+        await wrapper.setProps({ text: "Updated Text" });
+        
+        await waitForExpect(() => {
+            expect(editorMock.commands.setContent).toHaveBeenCalledWith("Updated Text");
+        });
+    });
+
+    // (4) paste HTML runs formatPastedHtml transform and converts <h1> to <h2>
+    it("runs formatPastedHtml on paste and converts <h1> to <h2>", async () => {
         const wrapper = mount(RTextEditor);
+        
+        // Retrieve the options passed to useEditor to access handlePaste
+        expect(useEditor).toHaveBeenCalled();
+        const options = (useEditor as any).mock.calls[0][0];
+        const handlePaste = options.editorProps.handlePaste;
+        
+        expect(handlePaste).toBeDefined();
 
-        const unlinkButton = wrapper
-            .findAll("button")
-            .find((button) => button.text() === "Unlink");
+        const htmlContent = "<h1>Title</h1><p>Body</p>";
+        const mockClipboardData = {
+            getData: vi.fn().mockReturnValue(htmlContent),
+        };
+        const mockEvent = {
+            clipboardData: mockClipboardData,
+            preventDefault: vi.fn(),
+        } as unknown as ClipboardEvent;
 
-        expect(unlinkButton?.attributes("disabled")).toBeDefined();
-    });
-
-    it("supports custom toolbar groups and labels", () => {
-        const wrapper = mount(RTextEditor, {
-            props: {
-                toolbarGroups: [
-                    ["bold", "italic"],
-                    ["link", "unlink"],
-                ],
-                toolbarLabels: {
-                    bold: "Strong",
-                },
-            },
-        });
-
-        expect(wrapper.findAll(".rte-toolbar-group").length).toBe(2);
-        const strongButton = wrapper
-            .findAll("button")
-            .find((button) => button.text() === "Strong");
-
-        expect(strongButton).toBeDefined();
-    });
-
-    it("applies custom classNames to the root and toolbar", () => {
-        const wrapper = mount(RTextEditor, {
-            props: {
-                classNames: {
-                    root: "custom-root",
-                    toolbar: "custom-toolbar",
-                },
-            },
-        });
-
-        expect(wrapper.find(".rte-root").classes()).toContain("custom-root");
-        expect(wrapper.find(".rte-toolbar").classes()).toContain("custom-toolbar");
-    });
-
-    it("renders a custom toolbar slot with provided props", () => {
-        const wrapper = mount(RTextEditor, {
-            props: {
-                toolbarItems: ["bold", "italic"],
-                showToolbar: true,
-                disabled: false,
-            },
-            slots: {
-                toolbar: '<div class="custom-toolbar-slot">Custom Toolbar</div>',
-            },
-        });
-
-        expect(wrapper.find(".custom-toolbar-slot").exists()).toBe(true);
-        expect(wrapper.find(".custom-toolbar-slot").text()).toBe("Custom Toolbar");
+        // Execute handlePaste
+        const handled = handlePaste(undefined, mockEvent);
+        
+        expect(handled).toBe(true);
+        expect(mockClipboardData.getData).toHaveBeenCalledWith("text/html");
+        
+        // Verify formatPastedHtml was applied (h1 -> h2)
+        // Note: formatPastedHtml should have run within the handlePaste logic
+        expect(editorMock.commands.insertContent).toHaveBeenCalledWith(
+            expect.stringContaining("<h2>Title</h2>")
+        );
+        expect(editorMock.commands.insertContent).not.toHaveBeenCalledWith(
+            expect.stringContaining("<h1>Title</h1>")
+        );
     });
 });

@@ -13,9 +13,9 @@
         "lib": ["ES2020", "DOM"]
     },
     "include": [
-        "index.ts",
-        "RichTextEditorStandalone.vue",
-        "formatPastedHtml.ts",
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "src/**/*.vue",
         "tests/**/*.ts"
     ]
 }

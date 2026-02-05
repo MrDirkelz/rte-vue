@@ -9,7 +9,7 @@ export default defineConfig({
   plugins: [vue()],
   resolve: {
     alias: {
-      'rte-vue': path.resolve(__dirname, '../index.ts')
+      'rte-vue': path.resolve(__dirname, '../src/index.ts')
     },
     extensions: ['.ts', '.vue', '.js']
   },
