@@ -1,6 +1,6 @@
 {
     "name": "rte-vue",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "A fully configurable, highly intuitive rich text editor component for Vue 3. Built with TipTap and TypeScript, supporting Markdown and JSON output.",
     "keywords": [
         "vue",
@@ -16,14 +16,14 @@
         "typescript",
         "vue-component"
     ],
-    "author": "DirkDevelopmentFreelance",
+    "author": "Dirk",
     "repository": {
         "type": "git",
-        "url": "https://github.com/DirkDevelopmentFreelance/dirk-rte-vue"
+        "url": "https://github.com/MrDirkelz/rte-vue"
     },
-    "homepage": "https://github.com/DirkDevelopmentFreelance/dirk-rte-vue#readme",
+    "homepage": "https://github.com/MrDirkelz/rte-vue#readme",
     "bugs": {
-        "url": "https://github.com/DirkDevelopmentFreelance/dirk-rte-vue/issues"
+        "url": "https://github.com/MrDirkelz/rte-vue/issues"
     },
     "type": "module",
     "main": "dist/index.cjs",
