@@ -5,16 +5,20 @@
     "keywords": [
         "vue",
         "vue3",
-        "rich-text-editor",
-        "wysiwyg",
         "tiptap",
-        "markdown-editor",
-        "html-editor",
+        "rich-text-editor",
+        "rte",
+        "wysiwyg",
         "editor",
-        "input",
+        "markdown",
+        "prosemirror",
+        "vue-tiptap",
+        "tiptap-vue",
+        "vue-editor",
+        "html-editor",
+        "text-editor",
         "component",
-        "typescript",
-        "vue-component"
+        "typescript"
     ],
     "author": "Dirk",
     "repository": {
