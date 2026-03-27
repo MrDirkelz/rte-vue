@@ -41,7 +41,7 @@ export type RichTextEditorProps = {
     toolbarItems?: ToolbarItem[];
     toolbarGroups?: ToolbarItem[][];
     toolbarLabels?: Partial<Record<ToolbarItem, string>>;
-    contentFormat?: "json" | "markdown";
+    contentFormat?: "html" | "markdown";
     headingOffset?: number;
     classNames?: {
         root?: string; // Root container

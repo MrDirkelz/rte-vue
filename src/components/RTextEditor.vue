@@ -33,7 +33,7 @@ const turndownService = new TurndownService({
 const props = withDefaults(defineProps<RichTextEditorProps>(), {
     disabled: false,
     showToolbar: true,
-    contentFormat: "json",
+    contentFormat: "html",
     headingOffset: 0,
     transformPastedHtml: formatPastedHtml,
     toolbarItems: () => [
@@ -67,34 +67,27 @@ const content = computed({
 const lastEmitted = ref<string | undefined>(undefined);
 
 /** Deserialize input string to TipTap content based on format */
-function deserializeContent(input: string, format: "json" | "markdown"): any {
+function deserializeContent(input: string, format: "html" | "markdown"): any {
     if (!input) return "";
     if (format === "markdown") {
-        const html = markdownParser.render(input);
-        return html;
+        return markdownParser.render(input);
     }
-    // JSON format
-    try {
-        return JSON.parse(input);
-    } catch {
-        return input;
-    }
+    // HTML format — TipTap accepts HTML strings directly
+    return input;
 }
 
 /** Serialize TipTap editor content to string based on format */
-function serializeContent(editor: any, format: "json" | "markdown"): string {
+function serializeContent(editor: any, format: "html" | "markdown"): string {
     if (!editor) return "";
     if (format === "markdown") {
-        const html = editor.getHTML();
-        return turndownService.turndown(html);
+        return turndownService.turndown(editor.getHTML());
     }
-    // JSON format
-    const json = editor.getJSON();
-    return JSON.stringify(json);
+    // HTML format
+    return editor.getHTML();
 }
 
 const editorText = computed(() => {
-    return deserializeContent(content.value, props.contentFormat ?? "json");
+    return deserializeContent(content.value, props.contentFormat ?? "html");
 });
 
 const editor = useEditor({
@@ -131,7 +124,7 @@ const editor = useEditor({
         },
     },
     onUpdate: ({ editor }) => {
-        const nextValue = serializeContent(editor, props.contentFormat ?? "json");
+        const nextValue = serializeContent(editor, props.contentFormat ?? "html");
         lastEmitted.value = nextValue;
         content.value = nextValue;
         props.onChange?.(nextValue);
@@ -309,7 +302,7 @@ watch(
             editor.value.commands.setContent("");
             return;
         }
-        const deserialized = deserializeContent(newValue, props.contentFormat ?? "json");
+        const deserialized = deserializeContent(newValue, props.contentFormat ?? "html");
         editor.value.commands.setContent(deserialized);
     },
 );
@@ -323,7 +316,7 @@ watch(
             editor.value.commands.setContent("");
             return;
         }
-        const deserialized = deserializeContent(content.value, props.contentFormat ?? "json");
+        const deserialized = deserializeContent(content.value, props.contentFormat ?? "html");
         editor.value.commands.setContent(deserialized);
     },
 );

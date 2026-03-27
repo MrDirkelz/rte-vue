@@ -95,7 +95,7 @@ const handleSave = (content: string) => {
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `modelValue` / `text` | `string` | `""` | The content of the editor. Supports `v-model`. |
-| `contentFormat` | `'json' \| 'markdown'` | `'json'` | Format for input and output strings. |
+| `contentFormat` | `'html' \| 'markdown'` | `'html'` | Format for input and output strings. |
 | `showToolbar` | `boolean` | `true` | Visibility of the toolbar. |
 | `disabled` | `boolean` | `false` | Disables editing. |
 | `placeholder` | `string` | - | Placeholder text when empty. |
