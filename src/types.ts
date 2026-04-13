@@ -27,7 +27,8 @@ export type ToolbarItem =
     | "bulletList"
     | "orderedList"
     | "link"
-    | "unlink";
+    | "unlink"
+    | "upload";
 
 /**
  * Component Props
@@ -43,6 +44,8 @@ export type RichTextEditorProps = {
     toolbarLabels?: Partial<Record<ToolbarItem, string>>;
     contentFormat?: "html" | "markdown";
     headingOffset?: number;
+    /** When true, enables file uploading: adds an "upload" toolbar button and allows drag-and-drop / paste of .docx, .odt, .odf, and .txt files directly onto the editor. */
+    uploader?: boolean;
     classNames?: {
         root?: string; // Root container
         header?: string; // Header wrapper
@@ -64,6 +67,10 @@ export type RichTextEditorProps = {
     onRequestLink?: () => void;
     onFocus?: () => void;
     onBlur?: () => void;
+    /** Called after a file is successfully parsed. Receives the original File and the parsed HTML string. */
+    onFileUpload?: (file: File, content: string) => void;
+    /** Called when file parsing fails. Receives the Error. */
+    onFileError?: (error: Error) => void;
     transformPastedHtml?: (html: string) => string;
 };
 

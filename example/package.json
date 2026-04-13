@@ -14,7 +14,9 @@
     "@tiptap/starter-kit": "^2.5.0",
     "@tiptap/extension-link": "^2.5.0",
     "markdown-it": "^14.0.0",
-    "turndown": "^7.1.0"
+    "turndown": "^7.1.0",
+    "mammoth": "^1.8.0",
+    "jszip": "^3.10.0"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.0",

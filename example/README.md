@@ -18,12 +18,12 @@ This is a demonstration project showcasing the RTextEditor component with variou
 
 ## Examples Included
 
-1. **Zero-Config Usage** - Simple v-model binding
-2. **Markdown Mode** - Store content as markdown
-3. **Heading Offset** - Perfect for blog posts where H1 is the title
-4. **Minimal** - No toolbar for clean text input
-5. **Fully Custom Styled** - Beautiful gradient design
-6. **All Heading Levels** - H1-H6 support
+1. **Default Style** - Zero-config v-model binding
+2. **File Uploader** - Upload `.docx`, `.odt`, `.odf`, `.txt` via toolbar button, drag-and-drop, or paste
+3. **File Uploader (Custom Styled)** - Same uploader with Tailwind-styled toolbar and editor
+4. **Custom Styled Toolbar** - Tailwind-styled toolbar and buttons
+5. **Toolbar Groups** - All heading levels, formatting, and link buttons grouped
+6. **Without Toolbar (Markdown)** - Minimal plain text input with Markdown output
 
 ## Building
 

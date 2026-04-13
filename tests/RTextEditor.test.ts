@@ -74,6 +74,7 @@ const createEditorMock = (overrides: Partial<Record<string, unknown>> = {}) => {
             },
         },
         getAttributes: vi.fn().mockReturnValue({}),
+        getHTML: vi.fn().mockReturnValue(""),
         chain: () => chain,
         commands: {
             setContent: vi.fn(),

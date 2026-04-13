@@ -16,7 +16,7 @@ import { useEditor, EditorContent } from "@tiptap/vue-3";
 import type { Editor } from "@tiptap/vue-3";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
-import { computed, ref, watch } from "vue";
+import { computed, ref, shallowRef, watch } from "vue";
 import MarkdownIt from "markdown-it";
 import TurndownService from "turndown";
 import formatPastedHtml from "../utils/formatPastedHtml";
@@ -66,13 +66,83 @@ const content = computed({
 
 const lastEmitted = ref<string | undefined>(undefined);
 
+// ── Uploader state ──
+const fileInputRef = shallowRef<HTMLInputElement | null>(null);
+const isDragOver = ref(false);
+const isUploading = ref(false);
+
+const ACCEPTED_EXTENSIONS = [".docx", ".odt", ".odf", ".txt"];
+
+function isAcceptedFile(file: File): boolean {
+    const ext = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
+    return ACCEPTED_EXTENSIONS.includes(ext);
+}
+
+async function handleFile(file: File) {
+    if (!isAcceptedFile(file)) return;
+    isUploading.value = true;
+    try {
+        const { default: parseDocumentFile } = await import("../utils/parseDocumentFile");
+        const html = await parseDocumentFile(file);
+        if (editor.value) {
+            editor.value.commands.setContent(html);
+            const serialized = serializeContent(editor.value, props.contentFormat ?? "html");
+            lastEmitted.value = serialized;
+            content.value = serialized;
+        } else {
+            content.value = html;
+        }
+        props.onFileUpload?.(file, html);
+    } catch (err) {
+        props.onFileError?.(err instanceof Error ? err : new Error(String(err)));
+    } finally {
+        isUploading.value = false;
+    }
+}
+
+function handleFileSelect(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (file) handleFile(file);
+    input.value = ""; // Reset so the same file can be re-selected
+}
+
+function handleEditorDragOver(e: DragEvent) {
+    if (!props.uploader) return;
+    e.preventDefault();
+    isDragOver.value = true;
+}
+
+function handleEditorDragLeave(e: DragEvent) {
+    if (!props.uploader) return;
+    const editorEl = (e.currentTarget as HTMLElement);
+    const relatedTarget = e.relatedTarget as Node | null;
+    if (relatedTarget && editorEl.contains(relatedTarget)) return;
+    isDragOver.value = false;
+}
+
+function handleEditorDrop(e: DragEvent) {
+    if (!props.uploader) return;
+    e.preventDefault();
+    isDragOver.value = false;
+    const file = e.dataTransfer?.files[0];
+    if (file && isAcceptedFile(file)) handleFile(file);
+}
+
 /** Deserialize input string to TipTap content based on format */
 function deserializeContent(input: string, format: "html" | "markdown"): any {
     if (!input) return "";
+    const trimmed = input.trimStart();
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+        try {
+            return JSON.parse(input);
+        } catch {
+            // Not valid JSON, fall through
+        }
+    }
     if (format === "markdown") {
         return markdownParser.render(input);
     }
-    // HTML format — TipTap accepts HTML strings directly
     return input;
 }
 
@@ -107,6 +177,15 @@ const editor = useEditor({
             const clipboardData = event.clipboardData;
             if (!clipboardData) return false;
 
+            // Handle pasted files when uploader is enabled
+            if (props.uploader && clipboardData.files.length > 0) {
+                const file = clipboardData.files[0];
+                if (isAcceptedFile(file)) {
+                    handleFile(file);
+                    return true;
+                }
+            }
+
             let html = clipboardData.getData("text/html");
             if (!html) return false;
 
@@ -119,7 +198,7 @@ const editor = useEditor({
             const isSave = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s";
             if (!isSave) return false;
             event.preventDefault();
-            props.onSave(content.value);
+            props.onSave(serializeContent(editor.value, props.contentFormat ?? "html"));
             return true;
         },
     },
@@ -147,13 +226,22 @@ const defaultToolbarItems: ToolbarItem[] = [
     "unlink",
 ];
 
-const toolbarItems = computed(() =>
-    props.toolbarItems?.length ? props.toolbarItems : defaultToolbarItems,
-);
+const toolbarItems = computed((): ToolbarItem[] => {
+    const items = props.toolbarItems?.length ? props.toolbarItems : defaultToolbarItems;
+    if (props.uploader && !items.includes("upload")) return [...items, "upload"];
+    return items;
+});
 
-const toolbarGroups = computed(() =>
-    props.toolbarGroups?.length ? props.toolbarGroups : [toolbarItems.value],
-);
+const toolbarGroups = computed((): ToolbarItem[][] => {
+    if (props.toolbarGroups?.length) {
+        const groups = props.toolbarGroups;
+        if (props.uploader && !groups.some((g) => g.includes("upload"))) {
+            return [...groups, ["upload"]];
+        }
+        return groups;
+    }
+    return [toolbarItems.value];
+});
 
 const hasTextSelected = computed(() => {
     const state = editor.value?.state;
@@ -187,6 +275,7 @@ const defaultLabels: Record<ToolbarItem, string> = {
     orderedList: "Numbers",
     link: "Link",
     unlink: "Unlink",
+    upload: "Upload",
 };
 
 /** Get custom or default label for toolbar item */
@@ -223,6 +312,8 @@ function isActive(item: ToolbarItem) {
         case "link":
         case "unlink":
             return editor.value.isActive("link");
+        case "upload":
+            return false;
         default:
             return false;
     }
@@ -233,6 +324,7 @@ function isDisabled(item: ToolbarItem) {
     if (props.disabled) return true;
     if (item === "link") return !hasTextSelected.value;
     if (item === "unlink") return !hasLinkSelected.value;
+    if (item === "upload") return isUploading.value;
     return false;
 }
 
@@ -281,6 +373,9 @@ function runCommand(item: ToolbarItem) {
         case "unlink":
             chain.unsetLink().run();
             break;
+        case "upload":
+            fileInputRef.value?.click();
+            break;
         default:
             break;
     }
@@ -298,12 +393,13 @@ watch(
     (newValue) => {
         if (!editor.value) return;
         if (newValue === lastEmitted.value) return;
-        if (!newValue) {
-            editor.value.commands.setContent("");
-            return;
-        }
-        const deserialized = deserializeContent(newValue, props.contentFormat ?? "html");
+        const deserialized = deserializeContent(newValue ?? "", props.contentFormat ?? "html");
         editor.value.commands.setContent(deserialized);
+        const serialized = serializeContent(editor.value, props.contentFormat ?? "html");
+        if (serialized !== newValue) {
+            lastEmitted.value = serialized;
+            content.value = serialized;
+        }
     },
 );
 
@@ -312,12 +408,13 @@ watch(
     (newLang, oldLang) => {
         if (!newLang || newLang === oldLang) return;
         if (!editor.value) return;
-        if (!content.value) {
-            editor.value.commands.setContent("");
-            return;
-        }
-        const deserialized = deserializeContent(content.value, props.contentFormat ?? "html");
+        const deserialized = deserializeContent(content.value ?? "", props.contentFormat ?? "html");
         editor.value.commands.setContent(deserialized);
+        const serialized = serializeContent(editor.value, props.contentFormat ?? "html");
+        if (serialized !== content.value) {
+            lastEmitted.value = serialized;
+            content.value = serialized;
+        }
     },
 );
 
@@ -338,6 +435,16 @@ defineExpose({
             />
             <div :class="['rte-title', props.classNames?.title]">{{ props.title }}</div>
         </div>
+
+        <!-- Hidden file input for the upload toolbar button -->
+        <input
+            v-if="props.uploader"
+            ref="fileInputRef"
+            type="file"
+            accept=".docx,.odt,.odf,.txt"
+            style="display: none"
+            @change="handleFileSelect"
+        />
 
         <div v-if="!props.disabled && props.showToolbar">
             <slot
@@ -370,12 +477,21 @@ defineExpose({
             </slot>
         </div>
 
-        <div :class="['rte-editor', props.classNames?.editor]" :style="editorStyle">
+        <div
+            :class="['rte-editor', props.classNames?.editor]"
+            :style="editorStyle"
+            @dragover="handleEditorDragOver"
+            @dragleave="handleEditorDragLeave"
+            @drop="handleEditorDrop"
+        >
             <div
-                v-if="props.placeholder && isEmpty"
+                v-if="props.placeholder && isEmpty && !isDragOver"
                 :class="['rte-placeholder', props.classNames?.placeholder]"
             >
                 {{ props.placeholder }}
+            </div>
+            <div v-if="props.uploader && isDragOver" class="rte-drop-overlay">
+                Drop file to import
             </div>
             <EditorContent
                 :editor="editor"
@@ -588,5 +704,23 @@ defineExpose({
     padding: 0;
     border-radius: 0;
     font-size: 0.875rem;
+}
+
+/* ── File Drop Overlay ── */
+
+:where(.rte-drop-overlay) {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px dashed #3b82f6; /* blue-500 */
+    border-radius: 0.375rem;
+    background-color: rgba(239, 246, 255, 0.9); /* blue-50 / 90% */
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #3b82f6; /* blue-500 */
+    pointer-events: none;
 }
 </style>

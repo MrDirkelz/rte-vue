@@ -14,6 +14,6 @@ export default defineConfig({
     extensions: ['.ts', '.vue', '.js']
   },
   optimizeDeps: {
-    include: ['@tiptap/vue-3', '@tiptap/starter-kit', '@tiptap/extension-link', 'markdown-it', 'turndown']
+    include: ['@tiptap/vue-3', '@tiptap/starter-kit', '@tiptap/extension-link', 'markdown-it', 'turndown', 'mammoth', 'jszip']
   }
 })

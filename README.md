@@ -22,6 +22,7 @@ Perfect for blogs, CMS, comment sections, or any Vue 3 app needing text editing.
   - Override specific buttons or the entire toolbar via **Slots**.
   - Custom styling for every element.
 - 🧱 **Block Styling**: Headings, lists, links, bold, italic, strike-through out of the box.
+- 📎 **File Uploader**: Import content from `.docx`, `.odt`, `.odf`, and `.txt` files with a single prop.
 - 🦾 **TypeScript**: Full TypeScript support with exported types.
 
 ## � Examples
@@ -107,6 +108,7 @@ const handleSave = (content: string) => {
 | `minHeight` | `string` | - | CSS min-height (e.g., '200px'). |
 | `maxHeight` | `string` | - | CSS max-height. |
 | `width` | `string` | - | CSS width. |
+| `uploader` | `boolean` | `false` | Enables file uploading: adds an `upload` toolbar button and allows drag-and-drop / paste of `.docx`, `.odt`, `.odf`, and `.txt` files onto the editor. |
 
 ### Events
 
@@ -117,6 +119,8 @@ const handleSave = (content: string) => {
 | `save` | `string` | Emitted when user presses `Cmd+S` or `Ctrl+S`. |
 | `focus` | - | Emitted when editor gains focus. |
 | `blur` | - | Emitted when editor loses focus. |
+| `file-upload` | `(file: File, content: string)` | Emitted after a file is successfully parsed. |
+| `file-error` | `(error: Error)` | Emitted when file parsing fails. |
 
 ### Slots
 
@@ -161,6 +165,7 @@ If you prefer writing custom CSS, you can target the following stable class name
 | `.rte-editor` | The wrapper around the editor content area. |
 | `.rte-editor-content` | The actual editable area (TipTap/ProseMirror container). |
 | `.rte-placeholder` | The absolute positioned placeholder text. |
+| `.rte-drop-overlay` | The overlay shown when dragging a file over the editor. |
 
 Since all defaults use `:where(.classname)`, your custom CSS will always win as long as it has a specificity greater than 0 (which is basically any class selector).
 
@@ -170,6 +175,72 @@ Since all defaults use `:where(.classname)`, your custom CSS will always win as 
   background-color: #fdf2f8; 
   border-radius: 12px;
 }
+```
+
+## 📎 File Uploader
+
+Enable the built-in file uploader to let users import content from `.docx`, `.odt`, `.odf`, and `.txt` files directly into the editor.
+
+### Basic Usage
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import { RTextEditor } from 'rte-vue';
+import 'rte-vue/dist/style.css';
+
+const content = ref('');
+
+const onFileUpload = (file: File, html: string) => {
+  console.log(`Imported "${file.name}" successfully`);
+};
+
+const onFileError = (error: Error) => {
+  console.error('File import failed:', error.message);
+};
+</script>
+
+<template>
+  <RTextEditor
+    v-model="content"
+    :uploader="true"
+    placeholder="Upload a file or start typing..."
+    @file-upload="onFileUpload"
+    @file-error="onFileError"
+  />
+</template>
+```
+
+When `uploader` is set to `true`, three ways to import a file are enabled:
+
+1. **Toolbar button** — An `Upload` button appears in the toolbar. Clicking it opens a file picker.
+2. **Drag and drop** — Drag a supported file directly onto the editor. A drop overlay will appear to confirm the target.
+3. **Paste** — Copy a file to the clipboard and paste it into the editor (Cmd/Ctrl+V).
+
+Once a file is imported, its content populates the editor and can be further edited.
+
+### Supported File Types
+
+| Extension | Description | Dependency |
+|-----------|-------------|------------|
+| `.docx` | Microsoft Word documents | `mammoth` (bundled) |
+| `.odt` | OpenDocument Text files | `jszip` (bundled) |
+| `.odf` | OpenDocument Format files | `jszip` (bundled) |
+| `.txt` | Plain text files | None |
+
+### Using `parseDocumentFile` Standalone
+
+The file parser is also exported for use outside of the component:
+
+```ts
+import { parseDocumentFile } from 'rte-vue';
+
+const fileInput = document.querySelector('input[type="file"]');
+fileInput.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  const html = await parseDocumentFile(file);
+  console.log(html);
+});
 ```
 
 ## ⌨️ Shortcuts

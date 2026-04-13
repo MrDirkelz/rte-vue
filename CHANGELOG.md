@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2026-03-31
+
+### Added
+- **File Uploader**: New `uploader` prop that enables document file importing via toolbar button, drag-and-drop onto the editor, and paste. Supports `.docx`, `.odt`, `.odf`, and `.txt` files.
+- New `"upload"` toolbar item with an upload icon in the toolbar.
+- New `onFileUpload` and `onFileError` event callbacks for handling upload results.
+- New `parseDocumentFile` utility exported for standalone use.
+- New `.rte-drop-overlay` CSS class shown when dragging files over the editor.
+- Added `mammoth` and `jszip` dependencies for document parsing.
+
 ## [1.0.3] - 2026-02-05
 
 ### Added

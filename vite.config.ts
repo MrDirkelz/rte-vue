@@ -7,6 +7,8 @@ const external = [
     "@tiptap/vue-3",
     "@tiptap/starter-kit",
     "@tiptap/extension-link",
+    "mammoth",
+    "jszip",
 ];
 
 export default defineConfig({
