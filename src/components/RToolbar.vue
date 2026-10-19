@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { Component } from "vue";
-import type { ToolbarItem } from "../types";
+import type { DownloadFormat, ToolbarItem } from "../types";
 import RToolbarButton from "./RToolbarButton.vue";
+import RDownloadButton from "./RDownloadButton.vue";
 
 interface Props {
   groups: ToolbarItem[][];
@@ -11,7 +12,10 @@ interface Props {
     toolbarGroup?: string;
     button?: string;
     buttonActive?: string;
+    downloadMenu?: string;
+    downloadMenuItem?: string;
   };
+  downloadFormats?: DownloadFormat[];
   // Function props for state/actions
   isActive: (item: ToolbarItem) => boolean;
   isDisabled: (item: ToolbarItem) => boolean;
@@ -22,6 +26,7 @@ const props = defineProps<Props>();
 
 const emit = defineEmits<{
   (e: "execute", item: ToolbarItem): void;
+  (e: "downloadSelect", format: DownloadFormat): void;
 }>();
 
 function onExecute(item: ToolbarItem) {
@@ -45,7 +50,25 @@ function onExecute(item: ToolbarItem) {
           :disabled="props.isDisabled(item)"
           :runCommand="onExecute"
         >
+          <RDownloadButton
+            v-if="
+              item === 'download' &&
+              props.downloadFormats !== undefined &&
+              props.downloadFormats.length >= 2
+            "
+            :formats="props.downloadFormats"
+            :label="props.getLabel(item)"
+            :icon="props.toolbarIcons[item]"
+            :disabled="props.isDisabled(item)"
+            :classNames="{
+              button: props.classNames?.button,
+              downloadMenu: props.classNames?.downloadMenu,
+              downloadMenuItem: props.classNames?.downloadMenuItem,
+            }"
+            @select="emit('downloadSelect', $event)"
+          />
           <RToolbarButton
+            v-else
             :item="item"
             :label="props.getLabel(item)"
             :active="props.isActive(item)"

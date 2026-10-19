@@ -168,8 +168,8 @@ describe("RTextEditor", () => {
         });
     });
 
-    // (4) paste HTML runs formatPastedHtml transform and converts <h1> to <h2>
-    it("runs formatPastedHtml on paste and converts <h1> to <h2>", async () => {
+    // (4) paste HTML runs formatPastedHtml transform and keeps <h1> by default
+    it("runs formatPastedHtml on paste and keeps <h1> by default", async () => {
         const wrapper = mount(RTextEditor);
         
         // Retrieve the options passed to useEditor to access handlePaste
@@ -194,13 +194,100 @@ describe("RTextEditor", () => {
         expect(handled).toBe(true);
         expect(mockClipboardData.getData).toHaveBeenCalledWith("text/html");
         
-        // Verify formatPastedHtml was applied (h1 -> h2)
+        // Verify formatPastedHtml was applied (h1 preserved)
         // Note: formatPastedHtml should have run within the handlePaste logic
         expect(editorMock.commands.insertContent).toHaveBeenCalledWith(
-            expect.stringContaining("<h2>Title</h2>")
-        );
-        expect(editorMock.commands.insertContent).not.toHaveBeenCalledWith(
             expect.stringContaining("<h1>Title</h1>")
         );
+    });
+
+    describe("download and copy", () => {
+        it("downloads html via the toolbar button for a single format", async () => {
+            editorMock.getHTML.mockReturnValue("<p>Hi</p>");
+            const onDownload = vi.fn().mockReturnValue(false);
+            const wrapper = mount(RTextEditor, {
+                props: { downloader: true, onDownload, downloadFilename: "doc" } as any,
+            });
+            await wrapper.find("button[title='Download']").trigger("click");
+            await waitForExpect(() => expect(onDownload).toHaveBeenCalled());
+            const arg = onDownload.mock.calls[0][0];
+            expect(arg.filename).toBe("doc.html");
+            expect(arg.content).toBe("<p>Hi</p>");
+        });
+
+        it("triggers a real download when onDownload does not cancel", async () => {
+            editorMock.getHTML.mockReturnValue("<p>Hi</p>");
+            const create = vi.fn().mockReturnValue("blob:x");
+            (URL as any).createObjectURL = create;
+            (URL as any).revokeObjectURL = vi.fn();
+            const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+            const wrapper = mount(RTextEditor, { props: { downloader: true } as any });
+            await wrapper.find("button[title='Download']").trigger("click");
+            await waitForExpect(() => expect(click).toHaveBeenCalled());
+            expect(create).toHaveBeenCalled();
+            click.mockRestore();
+        });
+
+        it("shows a format menu for multiple formats", async () => {
+            editorMock.getHTML.mockReturnValue("<p>Hi</p>");
+            const onDownload = vi.fn().mockReturnValue(false);
+            const wrapper = mount(RTextEditor, {
+                attachTo: document.body,
+                props: {
+                    downloader: true,
+                    onDownload,
+                    downloadFormats: [
+                        { id: "html", label: "HTML", extension: "html" },
+                        { id: "txt", label: "Text", extension: "txt" },
+                    ],
+                } as any,
+            });
+            await wrapper.find(".rte-download-trigger").trigger("click");
+            const items = document.querySelectorAll(".rte-download-menu-item");
+            expect(items.length).toBe(2);
+            (items[1] as HTMLElement).click();
+            await waitForExpect(() => expect(onDownload).toHaveBeenCalled());
+            expect(onDownload.mock.calls[0][0].filename).toBe("document.txt");
+            wrapper.unmount();
+        });
+
+        it("warns for unknown download formats", async () => {
+            const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+            const wrapper = mount(RTextEditor, {
+                props: {
+                    downloader: true,
+                    downloadFormats: [{ id: "pdf", label: "PDF", extension: "pdf" }],
+                } as any,
+            });
+            await wrapper.find("button[title='Download']").trigger("click");
+            await waitForExpect(() => expect(warn).toHaveBeenCalled());
+            warn.mockRestore();
+        });
+
+        it("copies plain text via clipboard.writeText when ClipboardItem is unavailable", async () => {
+            editorMock.getHTML.mockReturnValue("<p>Hello</p><p>World</p>");
+            const writeText = vi.fn().mockResolvedValue(undefined);
+            Object.defineProperty(navigator, "clipboard", {
+                value: { writeText },
+                configurable: true,
+            });
+            const wrapper = mount(RTextEditor, { props: { copyable: true } as any });
+            await wrapper.find("button[title='Copy']").trigger("click");
+            await waitForExpect(() => expect(writeText).toHaveBeenCalledWith("Hello\nWorld"));
+        });
+
+        it("skips copy when onCopy returns false", async () => {
+            editorMock.getHTML.mockReturnValue("<p>Hello</p>");
+            const writeText = vi.fn().mockResolvedValue(undefined);
+            Object.defineProperty(navigator, "clipboard", {
+                value: { writeText },
+                configurable: true,
+            });
+            const onCopy = vi.fn().mockReturnValue(false);
+            const wrapper = mount(RTextEditor, { props: { copyable: true, onCopy } as any });
+            await wrapper.find("button[title='Copy']").trigger("click");
+            await waitForExpect(() => expect(onCopy).toHaveBeenCalled());
+            expect(writeText).not.toHaveBeenCalled();
+        });
     });
 });
