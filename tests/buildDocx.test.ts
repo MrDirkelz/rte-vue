@@ -21,6 +21,14 @@ const HTML =
     "<ul><li><p>a</p><ol><li><p>b</p></li></ol></li></ul><p>&lt;tag&gt; &amp;</p>";
 
 describe("buildDocx", () => {
+    it("ships styled fonts, sizes and heading colours in styles.xml", async () => {
+        const zip = await unzip(await buildDocx(HTML));
+        const styles = await zip.file("word/styles.xml")!.async("string");
+        expect(styles).toContain('w:ascii="Calibri"');
+        expect(styles).toMatch(/styleId="Heading1">[\s\S]*?<w:color w:val="2F5496"\/>/);
+        expect(styles).toContain("<w:keepNext/>");
+    });
+
     it("produces a zip with the required parts", async () => {
         const zip = await unzip(await buildDocx(HTML));
         for (const f of ["[Content_Types].xml", "_rels/.rels", "word/document.xml"]) {

@@ -159,6 +159,13 @@ function numberingXml(nums: { abstractId: number }[]): string {
 const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:docDefaults>
+    <w:rPrDefault>
+      <w:rPr>
+        <w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:eastAsia="Calibri" w:cs="Calibri"/>
+        <w:sz w:val="22"/>
+        <w:szCs w:val="22"/>
+      </w:rPr>
+    </w:rPrDefault>
     <w:pPrDefault>
       <w:pPr>
         <w:spacing w:after="160" w:line="259" w:lineRule="auto"/>
@@ -175,8 +182,8 @@ const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
     <w:next w:val="Normal"/>
     <w:uiPriority w:val="9"/>
     <w:qFormat/>
-    <w:pPr><w:spacing w:before="240" w:after="60"/></w:pPr>
-    <w:rPr><w:b/><w:sz w:val="48"/></w:rPr>
+    <w:pPr><w:keepNext/><w:keepLines/><w:spacing w:before="240" w:after="60"/></w:pPr>
+    <w:rPr><w:rFonts w:ascii="Calibri Light" w:hAnsi="Calibri Light" w:cs="Calibri Light"/><w:color w:val="2F5496"/><w:sz w:val="32"/><w:szCs w:val="32"/></w:rPr>
   </w:style>
   <w:style w:type="paragraph" w:styleId="Heading2">
     <w:name w:val="heading 2"/>
@@ -184,8 +191,8 @@ const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
     <w:next w:val="Normal"/>
     <w:uiPriority w:val="9"/>
     <w:qFormat/>
-    <w:pPr><w:spacing w:before="200" w:after="60"/></w:pPr>
-    <w:rPr><w:b/><w:sz w:val="36"/></w:rPr>
+    <w:pPr><w:keepNext/><w:keepLines/><w:spacing w:before="200" w:after="60"/></w:pPr>
+    <w:rPr><w:rFonts w:ascii="Calibri Light" w:hAnsi="Calibri Light" w:cs="Calibri Light"/><w:color w:val="2F5496"/><w:sz w:val="26"/><w:szCs w:val="26"/></w:rPr>
   </w:style>
   <w:style w:type="paragraph" w:styleId="Heading3">
     <w:name w:val="heading 3"/>
@@ -193,8 +200,8 @@ const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
     <w:next w:val="Normal"/>
     <w:uiPriority w:val="9"/>
     <w:qFormat/>
-    <w:pPr><w:spacing w:before="160" w:after="60"/></w:pPr>
-    <w:rPr><w:b/><w:sz w:val="28"/></w:rPr>
+    <w:pPr><w:keepNext/><w:keepLines/><w:spacing w:before="160" w:after="60"/></w:pPr>
+    <w:rPr><w:rFonts w:ascii="Calibri Light" w:hAnsi="Calibri Light" w:cs="Calibri Light"/><w:color w:val="1F3763"/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr>
   </w:style>
   <w:style w:type="paragraph" w:styleId="Heading4">
     <w:name w:val="heading 4"/>
@@ -202,8 +209,8 @@ const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
     <w:next w:val="Normal"/>
     <w:uiPriority w:val="9"/>
     <w:qFormat/>
-    <w:pPr><w:spacing w:before="120" w:after="40"/></w:pPr>
-    <w:rPr><w:b/><w:sz w:val="24"/></w:rPr>
+    <w:pPr><w:keepNext/><w:keepLines/><w:spacing w:before="120" w:after="40"/></w:pPr>
+    <w:rPr><w:rFonts w:ascii="Calibri Light" w:hAnsi="Calibri Light" w:cs="Calibri Light"/><w:color w:val="2F5496"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr>
   </w:style>
   <w:style w:type="paragraph" w:styleId="Heading5">
     <w:name w:val="heading 5"/>
@@ -211,8 +218,8 @@ const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
     <w:next w:val="Normal"/>
     <w:uiPriority w:val="9"/>
     <w:qFormat/>
-    <w:pPr><w:spacing w:before="120" w:after="40"/></w:pPr>
-    <w:rPr><w:b/><w:sz w:val="22"/></w:rPr>
+    <w:pPr><w:keepNext/><w:keepLines/><w:spacing w:before="120" w:after="40"/></w:pPr>
+    <w:rPr><w:rFonts w:ascii="Calibri Light" w:hAnsi="Calibri Light" w:cs="Calibri Light"/><w:color w:val="2F5496"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr>
   </w:style>
   <w:style w:type="paragraph" w:styleId="Heading6">
     <w:name w:val="heading 6"/>
@@ -220,8 +227,8 @@ const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
     <w:next w:val="Normal"/>
     <w:uiPriority w:val="9"/>
     <w:qFormat/>
-    <w:pPr><w:spacing w:before="120" w:after="40"/></w:pPr>
-    <w:rPr><w:b/><w:sz w:val="20"/></w:rPr>
+    <w:pPr><w:keepNext/><w:keepLines/><w:spacing w:before="120" w:after="40"/></w:pPr>
+    <w:rPr><w:rFonts w:ascii="Calibri Light" w:hAnsi="Calibri Light" w:cs="Calibri Light"/><w:color w:val="1F3763"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr>
   </w:style>
   <w:style w:type="character" w:styleId="Hyperlink">
     <w:name w:val="Hyperlink"/>
