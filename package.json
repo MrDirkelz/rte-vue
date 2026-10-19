@@ -1,6 +1,6 @@
 {
     "name": "rte-vue",
-    "version": "2.2.5",
+    "version": "2.2.6",
     "description": "A fully configurable, highly intuitive rich text editor component for Vue 3. Built with TipTap and TypeScript, supporting Markdown and JSON output.",
     "keywords": [
         "vue",
