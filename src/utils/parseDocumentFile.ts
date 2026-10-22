@@ -41,7 +41,10 @@ async function parseDocx(file: File): Promise<string> {
         );
     }
     const arrayBuffer = await file.arrayBuffer();
-    const result = await mammoth.convertToHtml({ arrayBuffer });
+    const result = await mammoth.convertToHtml(
+        { arrayBuffer },
+        { styleMap: ["u => u"] },
+    );
     return result.value;
 }
 
@@ -67,7 +70,72 @@ async function parseOdt(file: File): Promise<string> {
 
 const ODF_NS_OFFICE = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const ODF_NS_TEXT = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
+const ODF_NS_STYLE = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
+const ODF_NS_FO = "urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0";
 const XLINK_NS = "http://www.w3.org/1999/xlink";
+
+type TextMarks = {
+    bold: boolean;
+    italic: boolean;
+    strike: boolean;
+    underline: boolean;
+};
+
+type OdfStyles = {
+    text: Map<string, TextMarks>;
+    ordered: Map<string, boolean>;
+};
+
+function textPropsFromStyle(style: Element): TextMarks {
+    const props = style.getElementsByTagNameNS(ODF_NS_STYLE, "text-properties")[0];
+    const none: TextMarks = { bold: false, italic: false, strike: false, underline: false };
+    if (!props) return none;
+    const weight = props.getAttributeNS(ODF_NS_FO, "font-weight") ?? "";
+    const fontStyle = props.getAttributeNS(ODF_NS_FO, "font-style") ?? "";
+    const strike = props.getAttributeNS(ODF_NS_STYLE, "text-line-through-style") ?? "none";
+    const underline = props.getAttributeNS(ODF_NS_STYLE, "text-underline-style") ?? "none";
+    return {
+        bold: /bold|[6-9]00/i.test(weight),
+        italic: /italic|oblique/i.test(fontStyle),
+        strike: strike !== "none" && strike !== "",
+        underline: underline !== "none" && underline !== "",
+    };
+}
+
+function parseAutoStyles(doc: Document): OdfStyles {
+    const text = new Map<string, TextMarks>();
+    const ordered = new Map<string, boolean>();
+    const styles = Array.from(doc.getElementsByTagNameNS(ODF_NS_STYLE, "style"));
+    for (const style of styles) {
+        const name = style.getAttributeNS(ODF_NS_STYLE, "name");
+        const family = style.getAttributeNS(ODF_NS_STYLE, "family");
+        if (!name || family !== "text") continue;
+        const marks = textPropsFromStyle(style);
+        if (marks.bold || marks.italic || marks.strike || marks.underline) {
+            text.set(name, marks);
+        }
+    }
+    const listStyles = Array.from(doc.getElementsByTagNameNS(ODF_NS_TEXT, "list-style"));
+    for (const ls of listStyles) {
+        const name = ls.getAttributeNS(ODF_NS_STYLE, "name");
+        if (!name) continue;
+        ordered.set(
+            name,
+            ls.getElementsByTagNameNS(ODF_NS_TEXT, "list-level-style-number").length > 0,
+        );
+    }
+    return { text, ordered };
+}
+
+function wrapMarks(inner: string, marks: TextMarks | undefined): string {
+    if (!marks) return inner;
+    let out = inner;
+    if (marks.strike) out = `<s>${out}</s>`;
+    if (marks.underline) out = `<u>${out}</u>`;
+    if (marks.italic) out = `<em>${out}</em>`;
+    if (marks.bold) out = `<strong>${out}</strong>`;
+    return out;
+}
 
 /** Convert ODF content.xml to basic HTML */
 function convertOdfToHtml(xml: string): string {
@@ -77,40 +145,47 @@ function convertOdfToHtml(xml: string): string {
     if (!body) return "";
     const textBody = body.getElementsByTagNameNS(ODF_NS_OFFICE, "text")[0];
     if (!textBody) return "";
-    return processOdfNodes(textBody.childNodes);
+    return processOdfNodes(textBody.childNodes, parseAutoStyles(doc));
 }
 
 /** Recursively convert ODF XML nodes to HTML */
-function processOdfNodes(nodes: NodeListOf<ChildNode>): string {
+function processOdfNodes(nodes: NodeListOf<ChildNode>, styles: OdfStyles): string {
     let html = "";
     for (const node of Array.from(nodes)) {
         if (node.nodeType === Node.TEXT_NODE) {
             html += node.textContent || "";
         } else if (node.nodeType === Node.ELEMENT_NODE) {
             const el = node as Element;
+            const styleName = el.getAttributeNS(ODF_NS_TEXT, "style-name") ?? "";
             switch (el.localName) {
                 case "p":
-                    html += `<p>${processOdfNodes(el.childNodes)}</p>`;
+                    html += `<p>${processOdfNodes(el.childNodes, styles)}</p>`;
                     break;
                 case "h": {
                     const level =
                         el.getAttributeNS(ODF_NS_TEXT, "outline-level") || "1";
                     const h = Math.min(parseInt(level, 10) || 1, 6);
-                    html += `<h${h}>${processOdfNodes(el.childNodes)}</h${h}>`;
+                    html += `<h${h}>${processOdfNodes(el.childNodes, styles)}</h${h}>`;
                     break;
                 }
                 case "span":
-                    html += processOdfNodes(el.childNodes);
+                    html += wrapMarks(
+                        processOdfNodes(el.childNodes, styles),
+                        styles.text.get(styleName),
+                    );
                     break;
-                case "list":
-                    html += `<ul>${processOdfNodes(el.childNodes)}</ul>`;
+                case "list": {
+                    const tag = styles.ordered.get(styleName) ? "ol" : "ul";
+                    html += `<${tag}>${processOdfNodes(el.childNodes, styles)}</${tag}>`;
                     break;
+                }
                 case "list-item":
-                    html += `<li>${processOdfNodes(el.childNodes)}</li>`;
+                    html += `<li>${processOdfNodes(el.childNodes, styles)}</li>`;
                     break;
                 case "a": {
-                    const href = el.getAttributeNS(XLINK_NS, "href") || "";
-                    html += `<a href="${href}">${processOdfNodes(el.childNodes)}</a>`;
+                    const inner = processOdfNodes(el.childNodes, styles);
+                    const href = el.getAttributeNS(XLINK_NS, "href");
+                    html += href ? `<a href="${href}">${inner}</a>` : inner;
                     break;
                 }
                 case "line-break":
@@ -128,7 +203,7 @@ function processOdfNodes(nodes: NodeListOf<ChildNode>): string {
                     break;
                 }
                 default:
-                    html += processOdfNodes(el.childNodes);
+                    html += processOdfNodes(el.childNodes, styles);
                     break;
             }
         }

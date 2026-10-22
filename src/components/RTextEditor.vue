@@ -16,11 +16,18 @@ import { useEditor, EditorContent } from "@tiptap/vue-3";
 import type { Editor } from "@tiptap/vue-3";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
+import Underline from "@tiptap/extension-underline";
 import { computed, ref, shallowRef, watch } from "vue";
 import MarkdownIt from "markdown-it";
 import TurndownService from "turndown";
 import formatPastedHtml from "../utils/formatPastedHtml";
-import type { HeadingLevel, ToolbarItem, RichTextEditorProps } from "../types";
+import triggerDownload from "../utils/triggerDownload";
+import type {
+    HeadingLevel,
+    ToolbarItem,
+    RichTextEditorProps,
+    DownloadFormat,
+} from "../types";
 import { defaultToolbarIcons } from "./icons";
 import RToolbar from "./RToolbar.vue";
 
@@ -29,6 +36,12 @@ const turndownService = new TurndownService({
     headingStyle: "atx",
     codeBlockStyle: "fenced",
 });
+turndownService.addRule("strikethrough", {
+    filter: ["s", "del", "strike"] as any,
+    replacement: (content: string) => `~~${content}~~`,
+});
+// Markdown has no underline syntax; keep <u> as inline HTML.
+turndownService.keep(["u"]);
 
 const props = withDefaults(defineProps<RichTextEditorProps>(), {
     disabled: false,
@@ -156,6 +169,26 @@ function serializeContent(editor: any, format: "html" | "markdown"): string {
     return editor.getHTML();
 }
 
+const DEFAULT_MIME: Record<string, string> = {
+    markdown: "text/markdown",
+    html: "text/html",
+    txt: "text/plain",
+};
+const OFFICE_IDS = new Set(["docx", "odt", "odf"]);
+const TEXT_IDS = new Set(["txt"]);
+
+/** Convert editor HTML to plain text, keeping paragraph/line breaks */
+function htmlToPlainText(html: string): string {
+    const withBreaks = html
+        .replace(/<\/(p|div|h[1-6]|li|blockquote|pre)>/gi, "$&\n")
+        .replace(/<br\s*\/?>/gi, "\n");
+    const doc = new DOMParser().parseFromString(`<body>${withBreaks}</body>`, "text/html");
+    return (doc.body.textContent ?? "")
+        .replace(/[ \t]+\n/g, "\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+}
+
 const editorText = computed(() => {
     return deserializeContent(content.value, props.contentFormat ?? "html");
 });
@@ -165,8 +198,11 @@ const editor = useEditor({
     extensions: [
         StarterKit.configure({
             heading: { levels: [1, 2, 3, 4, 5, 6] },
-        }),
+            link: false,
+            underline: false,
+        } as any),
         Link.configure({ openOnClick: false }),
+        Underline,
     ],
     editable: !props.disabled,
     editorProps: {
@@ -226,19 +262,114 @@ const defaultToolbarItems: ToolbarItem[] = [
     "unlink",
 ];
 
+/** Content of the editor converted for a given download format id */
+function contentForFormat(id: string): string {
+    const ed = editor.value;
+    if (!ed) return "";
+    if (id === "html") return ed.getHTML();
+    if (id === "markdown") return turndownService.turndown(ed.getHTML());
+    if (OFFICE_IDS.has(id)) return ed.getHTML();
+    if (TEXT_IDS.has(id)) return htmlToPlainText(ed.getHTML());
+    return serializeContent(ed, props.contentFormat ?? "html");
+}
+
+const effectiveFormats = computed((): DownloadFormat[] => {
+    if (props.downloadFormats?.length) return props.downloadFormats;
+    if (props.contentFormat === "markdown") {
+        return [
+            { id: "markdown", label: "Markdown (.md)", extension: "md", mimeType: "text/markdown" },
+        ];
+    }
+    return [{ id: "html", label: "HTML (.html)", extension: "html", mimeType: "text/html" }];
+});
+
+const isMultiFormat = computed(() => effectiveFormats.value.length >= 2);
+
+async function handleDownload(format: DownloadFormat) {
+    if (!editor.value) return;
+    const content = contentForFormat(format.id);
+    const filename = `${props.downloadFilename ?? "document"}.${format.extension}`;
+    const result = props.onDownload?.({ content, filename, format });
+    if (result === false) return;
+    if (format.id === "markdown" || format.id === "html" || format.id === "txt") {
+        triggerDownload(content, filename, format.mimeType ?? DEFAULT_MIME[format.id]);
+        return;
+    }
+    if (format.id === "docx") {
+        const { default: buildDocx } = await import("../utils/buildDocx");
+        triggerDownload(await buildDocx(content), filename);
+        return;
+    }
+    if (format.id === "odt" || format.id === "odf") {
+        const { default: buildOdt } = await import("../utils/buildOdt");
+        triggerDownload(await buildOdt(content), filename);
+        return;
+    }
+    console.warn(`[rte-vue] No handler provided for download format "${format.id}"`);
+}
+
+async function handleCopy() {
+    if (!editor.value) return;
+    const format = props.contentFormat ?? "html";
+    const content = serializeContent(editor.value, format);
+    if (props.onCopy?.({ content, format }) === false) return;
+    const html = editor.value.getHTML();
+    const plain = htmlToPlainText(html);
+    if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
+        try {
+            await navigator.clipboard.write([
+                new ClipboardItem({
+                    "text/html": new Blob([html], { type: "text/html" }),
+                    "text/plain": new Blob([plain], { type: "text/plain" }),
+                }),
+            ]);
+            return;
+        } catch {
+            // fall through to the next strategy
+        }
+    }
+    try {
+        await navigator.clipboard.writeText(plain);
+        return;
+    } catch {
+        // fall through to the legacy strategy
+    }
+    const el = document.createElement("div");
+    el.contentEditable = "true";
+    el.style.position = "fixed";
+    el.style.left = "-9999px";
+    el.style.opacity = "0";
+    el.innerHTML = html;
+    document.body.appendChild(el);
+    try {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+        document.execCommand("copy");
+    } finally {
+        window.getSelection()?.removeAllRanges();
+        document.body.removeChild(el);
+    }
+}
+
 const toolbarItems = computed((): ToolbarItem[] => {
-    const items = props.toolbarItems?.length ? props.toolbarItems : defaultToolbarItems;
-    if (props.uploader && !items.includes("upload")) return [...items, "upload"];
+    let items = props.toolbarItems?.length ? props.toolbarItems : defaultToolbarItems;
+    if (props.uploader && !items.includes("upload")) items = [...items, "upload"];
+    if (props.downloader && !items.includes("download")) items = [...items, "download"];
+    if (props.copyable && !items.includes("copy")) items = [...items, "copy"];
     return items;
 });
 
 const toolbarGroups = computed((): ToolbarItem[][] => {
     if (props.toolbarGroups?.length) {
         const groups = props.toolbarGroups;
-        if (props.uploader && !groups.some((g) => g.includes("upload"))) {
-            return [...groups, ["upload"]];
-        }
-        return groups;
+        const extra: ToolbarItem[] = [];
+        if (props.uploader && !groups.some((g) => g.includes("upload"))) extra.push("upload");
+        if (props.downloader && !groups.some((g) => g.includes("download"))) extra.push("download");
+        if (props.copyable && !groups.some((g) => g.includes("copy"))) extra.push("copy");
+        return extra.length ? [...groups, extra] : groups;
     }
     return [toolbarItems.value];
 });
@@ -276,6 +407,8 @@ const defaultLabels: Record<ToolbarItem, string> = {
     link: "Link",
     unlink: "Unlink",
     upload: "Upload",
+    download: "Download",
+    copy: "Copy",
 };
 
 /** Get custom or default label for toolbar item */
@@ -313,6 +446,8 @@ function isActive(item: ToolbarItem) {
         case "unlink":
             return editor.value.isActive("link");
         case "upload":
+        case "download":
+        case "copy":
             return false;
         default:
             return false;
@@ -324,6 +459,7 @@ function isDisabled(item: ToolbarItem) {
     if (props.disabled) return true;
     if (item === "link") return !hasTextSelected.value;
     if (item === "unlink") return !hasLinkSelected.value;
+    if (item === "download" || item === "copy") return editor.value?.isEmpty ?? true;
     if (item === "upload") return isUploading.value;
     return false;
 }
@@ -375,6 +511,12 @@ function runCommand(item: ToolbarItem) {
             break;
         case "upload":
             fileInputRef.value?.click();
+            break;
+        case "download":
+            if (!isMultiFormat.value) void handleDownload(effectiveFormats.value[0]);
+            break;
+        case "copy":
+            void handleCopy();
             break;
         default:
             break;
@@ -464,11 +606,15 @@ defineExpose({
                         toolbarGroup: props.classNames?.toolbarGroup,
                         button: props.classNames?.button,
                         buttonActive: props.classNames?.buttonActive,
+                        downloadMenu: props.classNames?.downloadMenu,
+                        downloadMenuItem: props.classNames?.downloadMenuItem,
                     }"
+                    :download-formats="isMultiFormat ? effectiveFormats : undefined"
                     :isActive="isActive"
                     :isDisabled="isDisabled"
                     :getLabel="getLabel"
                     @execute="runCommand"
+                    @download-select="handleDownload"
                 >
                     <template #button="slotProps">
                         <slot name="toolbar-button" v-bind="slotProps" />
@@ -571,7 +717,7 @@ defineExpose({
     color: #a1a1aa; /* zinc-400 */
 }
 
-:where(.rte-editor-content .ProseMirror) {
+.rte-editor-content .ProseMirror {
     flex: 1;
     width: 100%;
     outline: none;
@@ -582,11 +728,11 @@ defineExpose({
     color: #27272a;
 }
 
-:where(.rte-editor-content .ProseMirror > :first-child) {
+.rte-editor-content .ProseMirror > :first-child {
     margin-top: 0;
 }
 
-:where(.rte-editor-content .ProseMirror h1) {
+.rte-editor-content .ProseMirror h1 {
     font-size: 2em;
     font-weight: 700;
     margin: 0.67em 0;
@@ -594,7 +740,7 @@ defineExpose({
     color: #18181b;
 }
 
-:where(.rte-editor-content .ProseMirror h2) {
+.rte-editor-content .ProseMirror h2 {
     font-size: 1.5em;
     font-weight: 700;
     margin: 0.75em 0;
@@ -602,7 +748,7 @@ defineExpose({
     color: #18181b;
 }
 
-:where(.rte-editor-content .ProseMirror h3) {
+.rte-editor-content .ProseMirror h3 {
     font-size: 1.17em;
     font-weight: 600;
     margin: 0.83em 0;
@@ -610,7 +756,7 @@ defineExpose({
     color: #18181b;
 }
 
-:where(.rte-editor-content .ProseMirror h4) {
+.rte-editor-content .ProseMirror h4 {
     font-size: 1em;
     font-weight: 600;
     margin: 1em 0;
@@ -618,7 +764,7 @@ defineExpose({
     color: #18181b;
 }
 
-:where(.rte-editor-content .ProseMirror h5) {
+.rte-editor-content .ProseMirror h5 {
     font-size: 0.83em;
     font-weight: 600;
     margin: 0.5rem 0;
@@ -626,7 +772,7 @@ defineExpose({
     color: #18181b;
 }
 
-:where(.rte-editor-content .ProseMirror h6) {
+.rte-editor-content .ProseMirror h6 {
     font-size: 0.67em;
     font-weight: 600;
     margin: 0.5rem 0;
@@ -634,46 +780,46 @@ defineExpose({
     color: #18181b;
 }
 
-:where(.rte-editor-content .ProseMirror p) {
+.rte-editor-content .ProseMirror p {
     margin: 0.5rem 0;
 }
 
-:where(.rte-editor-content .ProseMirror strong) {
+.rte-editor-content .ProseMirror strong {
     font-weight: 700;
 }
 
-:where(.rte-editor-content .ProseMirror em) {
+.rte-editor-content .ProseMirror em {
     font-style: italic;
 }
 
-:where(.rte-editor-content .ProseMirror ul) {
+.rte-editor-content .ProseMirror ul {
     list-style-type: disc;
     padding-left: 1.5rem;
     margin: 0.5rem 0;
 }
 
-:where(.rte-editor-content .ProseMirror ol) {
+.rte-editor-content .ProseMirror ol {
     list-style-type: decimal;
     padding-left: 1.5rem;
     margin: 0.5rem 0;
 }
 
-:where(.rte-editor-content .ProseMirror li) {
+.rte-editor-content .ProseMirror li {
     margin: 0.25rem 0;
 }
 
-:where(.rte-editor-content .ProseMirror a) {
+.rte-editor-content .ProseMirror a {
     color: #3b82f6;
     text-decoration: underline;
     cursor: pointer;
     transition: color 0.15s ease-in-out;
 }
 
-:where(.rte-editor-content .ProseMirror a:hover) {
+.rte-editor-content .ProseMirror a:hover {
     color: #2563eb;
 }
 
-:where(.rte-editor-content .ProseMirror blockquote) {
+.rte-editor-content .ProseMirror blockquote {
     border-left: 4px solid #e4e4e7;
     padding-left: 1rem;
     margin: 1rem 0;
@@ -681,7 +827,7 @@ defineExpose({
     font-style: italic;
 }
 
-:where(.rte-editor-content .ProseMirror code) {
+.rte-editor-content .ProseMirror code {
     background-color: #f4f4f5;
     padding: 0.125rem 0.25rem;
     border-radius: 0.25rem;
@@ -689,7 +835,7 @@ defineExpose({
     font-size: 0.875em;
 }
 
-:where(.rte-editor-content .ProseMirror pre) {
+.rte-editor-content .ProseMirror pre {
     background-color: #27272a;
     color: #fafafa;
     padding: 1rem;
@@ -698,7 +844,7 @@ defineExpose({
     margin: 1rem 0;
 }
 
-:where(.rte-editor-content .ProseMirror pre code) {
+.rte-editor-content .ProseMirror pre code {
     background-color: transparent;
     color: inherit;
     padding: 0;

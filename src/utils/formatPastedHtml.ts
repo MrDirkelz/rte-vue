@@ -1,103 +1,228 @@
 /**
- * A helper function to format pasted html into readable text for the user
- * and headings we support with our text editor component
- * @param html the html data to parse
- * @returns the parsed html ready for use
+ * Options for formatPastedHtml.
  */
+export type FormatPastedHtmlOptions = {
+    /**
+     * Demote every heading in the pasted content by this many levels
+     * (capped at h6). Defaults to 0 (preserve original heading levels).
+     */
+    headingOffset?: number;
+};
 
-export default function formatPastedHtml(html: string) {
-    html = html
-        .trim() // Remove leading and trailing whitespace first
-        .replace(/[\r\n\u2028\u2029]+/g, " ") // Remove all line breaks that get added by text editors like word before processing
-        .replace(/\u00AD/g, "") // remove soft hyphens
-        .replace(/>\s+</g, "><") // Remove spaces between tags
-        .replace(/<br\s*\/?>/gi, "") // Remove standalone <br>
-        .replace(/<p>\s*<\/p>/gi, "") // Remove empty paragraphs
-        .replace(/&nbsp;/g, " ") // Clean non breaking spaces
-        .replace(/^\s+|\s+$/g, ""); // Remove leading and trailing whitespace after all processing
+const BLOCK_TAGS = new Set([
+    "p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li",
+    "blockquote", "pre", "table", "thead", "tbody", "tfoot", "tr", "td", "th",
+    "section", "article", "aside", "header", "footer", "figure", "figcaption",
+    "main", "nav", "dl", "dt", "dd", "hr",
+]);
 
-    // Convert Word Online style-based formatting to semantic HTML tags
-    // Word Online uses inline styles instead of semantic tags like <strong> and <em>
-    html = convertWordOnlineStylesToSemanticHtml(html);
-
-    // Only demote headings when an h1 is present to preserve hierarchy. The editor supports h2-h5.
-    if (/<h1/i.test(html)) {
-        html = html
-            .replace(/<h([1-6])([^>]*)>/gi, (_, level, attrs) => {
-                const newLevel = Math.min(parseInt(level) + 1, 6);
-                return `<h${newLevel}${attrs}>`;
-            })
-            .replace(/<\/h([1-6])>/gi, (_, level) => {
-                const newLevel = Math.min(parseInt(level) + 1, 6);
-                return `</h${newLevel}>`;
-            });
-    }
-
-    // Convert any non-supported headings (h6-h9) to paragraphs to preserve their content.
-    return html
-        .replace(/<h([6-9]|\d{2,})([^>]*)>/gi, "<p$2>")
-        .replace(/<\/h([6-9]|\d{2,})>/gi, "</p>")
-        .trim(); // Remove leading and trailing whitespace
+function isBlockElement(node: Node | null | undefined): boolean {
+    return (
+        (node?.nodeType ?? 0) === Node.ELEMENT_NODE &&
+        BLOCK_TAGS.has((node as Element).tagName.toLowerCase())
+    );
 }
 
 /**
- * Convert Word Online's style-based formatting to semantic HTML tags.
- * Word Online uses spans with inline styles (font-weight: bold, font-style: italic)
- * instead of semantic tags like <strong> and <em>.
+ * Collapse runs of whitespace inside text nodes and trim whitespace that sits
+ * next to block-level boundaries.
  */
-function convertWordOnlineStylesToSemanticHtml(html: string): string {
-    // Process bold spans: <span style="...font-weight: bold...">text</span> -> <strong>text</strong>
-    // Also handles font-weight: 700 or higher numeric values
+function collapseWhitespace(html: string): string {
+    if (typeof DOMParser === "undefined") {
+        return html.replace(/ {2,}/g, " ");
+    }
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const nodes: Text[] = [];
+    const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+    let current: Node | null;
+    while ((current = walker.nextNode())) {
+        const text = current as Text;
+        if (text.textContent) {
+            text.textContent = text.textContent.replace(/\s+/g, " ");
+        }
+        nodes.push(text);
+    }
+    for (const text of nodes) {
+        /* v8 ignore next -- @preserve: collected nodes always have content; the empty-content guard is defensive */
+        if (!text.textContent) continue;
+        const prev = text.previousSibling;
+        const next = text.nextSibling;
+        const parentIsBlock = isBlockElement(text.parentNode);
+        const atStart = isBlockElement(prev) || (prev === null && parentIsBlock);
+        const atEnd = isBlockElement(next) || (next === null && parentIsBlock);
+        let value = text.textContent;
+        if (atStart) value = value.replace(/^ /, "");
+        if (atEnd) value = value.replace(/ $/, "");
+        if (value === "") {
+            text.parentNode?.removeChild(text);
+        } else if (value !== text.textContent) {
+            text.textContent = value;
+        }
+    }
+    return doc.body.innerHTML;
+}
+
+type Marks = { bold: boolean; italic: boolean; underline: boolean; strike: boolean };
+
+function marksFromStyle(style: string): Marks {
+    return {
+        // Word Online uses either keyword `bold` or numeric weights 700-900.
+        bold: /font-weight:\s*(bold|[7-9]\d{2})/i.test(style),
+        italic: /font-style:\s*italic/i.test(style),
+        // text-decoration can carry multiple values (e.g. "underline line-through"),
+        // so look for the keyword anywhere in the declaration.
+        underline: /text-decoration:[^;"]*\bunderline\b/i.test(style),
+        strike: /text-decoration:[^;"]*\bline-through\b/i.test(style),
+    };
+}
+
+function wrapWithMarks(span: Element, marks: Marks): Node {
+    const doc = span.ownerDocument;
+    const fragment = doc.createDocumentFragment();
+    while (span.firstChild) fragment.appendChild(span.firstChild);
+    let result: Node = fragment;
+    const wrap = (node: Node, tag: string) => {
+        const el = doc.createElement(tag);
+        el.appendChild(node);
+        return el;
+    };
+    if (marks.strike) result = wrap(result, "s");
+    if (marks.underline) result = wrap(result, "u");
+    if (marks.italic) result = wrap(result, "em");
+    if (marks.bold) result = wrap(result, "strong");
+    return result;
+}
+
+function convertSpans(root: Element): void {
+    const spans = Array.from(root.querySelectorAll("span")).reverse();
+    for (const span of spans) {
+        const marks = marksFromStyle(span.getAttribute("style") ?? "");
+        const replacement = wrapWithMarks(span, marks);
+        span.parentNode?.replaceChild(replacement, span);
+    }
+}
+
+const KEPT_STYLE_PROPS = new Set(["font-weight", "font-style", "text-decoration"]);
+
+function stripWordArtifacts(root: Element): void {
+    const all = root.querySelectorAll("*");
+    for (const el of Array.from(all)) {
+        const cls = el.getAttribute("class");
+        if (cls && /\bMso[\w-]*/.test(cls)) {
+            const cleaned = cls.replace(/\bMso[\w-]*/g, "").trim();
+            if (cleaned) el.setAttribute("class", cleaned);
+            else el.removeAttribute("class");
+        }
+        const style = el.getAttribute("style");
+        if (style == null) continue;
+        if (/mso-/i.test(style)) {
+            el.removeAttribute("style");
+            continue;
+        }
+        const kept = style
+            .split(";")
+            .map((d) => d.trim())
+            .filter((d) => {
+                if (!d) return false;
+                const prop = d.split(":")[0].trim().toLowerCase();
+                return KEPT_STYLE_PROPS.has(prop);
+            });
+        if (kept.length === 0) el.removeAttribute("style");
+        else el.setAttribute("style", kept.join("; "));
+    }
+}
+
+/** Regex fallback used when DOMParser is unavailable. */
+function convertWithRegex(html: string): string {
     html = html.replace(
         /<span[^>]*style="[^"]*font-weight:\s*(bold|[7-9]\d{2})[^"]*"[^>]*>(.*?)<\/span>/gi,
-        (match, _weight, content) => {
-            // Check if there's also italic styling
-            if (/font-style:\s*italic/i.test(match)) {
-                return `<strong><em>${content}</em></strong>`;
-            }
-            return `<strong>${content}</strong>`;
-        },
+        (match, _w, content) =>
+            /font-style:\s*italic/i.test(match)
+                ? `<strong><em>${content}</em></strong>`
+                : `<strong>${content}</strong>`,
     );
-
-    // Process italic spans: <span style="...font-style: italic...">text</span> -> <em>text</em>
     html = html.replace(
         /<span[^>]*style="[^"]*font-style:\s*italic[^"]*"[^>]*>(.*?)<\/span>/gi,
-        (match, content) => {
-            // Skip if already processed as bold+italic
-            if (/font-weight:\s*(bold|[7-9]\d{2})/i.test(match)) {
-                return match;
-            }
-            return `<em>${content}</em>`;
-        },
+        (_m, content) => `<em>${content}</em>`,
     );
-
-    // Process underline spans: <span style="...text-decoration: underline...">text</span> -> <u>text</u>
     html = html.replace(
         /<span[^>]*style="[^"]*text-decoration:\s*underline[^"]*"[^>]*>(.*?)<\/span>/gi,
         "<u>$1</u>",
     );
-
-    // Process strikethrough spans: <span style="...text-decoration: line-through...">text</span> -> <s>text</s>
     html = html.replace(
         /<span[^>]*style="[^"]*text-decoration:\s*line-through[^"]*"[^>]*>(.*?)<\/span>/gi,
         "<s>$1</s>",
     );
-
-    // Remove remaining empty or style-only spans that don't contain meaningful formatting
     html = html.replace(/<span[^>]*>(.*?)<\/span>/gi, "$1");
-
-    // Remove MSO-specific classes and styles
     html = html.replace(/\s*class="Mso[^"]*"/gi, "");
     html = html.replace(/\s*style="[^"]*mso-[^"]*"/gi, "");
-
-    // Clean up any remaining style attributes that only contain mso- properties
-    html = html.replace(/\s*style="[^"]*"/gi, (match) => {
-        // Keep the style if it has non-mso properties we care about
-        if (/font-weight|font-style|text-decoration/i.test(match)) {
-            return match;
-        }
-        return "";
-    });
-
+    html = html.replace(/\s*style="[^"]*"/gi, (m) =>
+        /font-weight|font-style|text-decoration/i.test(m) ? m : "",
+    );
     return html;
+}
+
+function sanitizeWordHtml(html: string): string {
+    if (typeof DOMParser === "undefined") {
+        return convertWithRegex(html);
+    }
+    const doc = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
+    convertSpans(doc.body);
+    stripWordArtifacts(doc.body);
+    return doc.body.innerHTML;
+}
+
+/**
+ * Format pasted/uploaded HTML for the editor:
+ *   - remove images (the editor has no image support; uploaded `.docx` files in
+ *     particular embed images as large base64 `<img>` tags we never want)
+ *   - strip editor-injected line breaks and soft hyphens
+ *   - convert Word Online style-based formatting to semantic tags
+ *   - collapse whitespace inside text nodes so line-wrapped source
+ *     HTML doesn't introduce visible double-spaces
+ *   - optionally demote headings by `headingOffset`
+ *
+ * The original heading structure is preserved unless a non-zero
+ * `headingOffset` is supplied.
+ */
+export default function formatPastedHtml(
+    html: string,
+    options: FormatPastedHtmlOptions = {},
+): string {
+    const offset = Math.max(0, Math.floor(options.headingOffset ?? 0));
+
+    html = html
+        .trim()
+        .replace(/<img\b[^>]*>/gi, "")
+        .replace(/<\/img>/gi, "")
+        .replace(/[\r\n\u2028\u2029]+/g, " ")
+        .replace(/\u00ad/g, "")
+        .replace(
+            /<p(\b[^>]*)>(?:\s|&nbsp;|\u00a0)*(?:&nbsp;|\u00a0)(?:\s|&nbsp;|\u00a0)*<\/p>/gi,
+            "<p$1><br></p>",
+        )
+        .replace(/<p\b[^>]*>[ \t\r\n]*<\/p>/gi, "")
+        .replace(/&nbsp;/g, " ")
+        .replace(/^\s+|\s+$/g, "");
+
+    html = sanitizeWordHtml(html);
+    html = collapseWhitespace(html);
+
+    if (offset > 0) {
+        html = html
+            .replace(
+                /<h([1-6])([^>]*)>/gi,
+                (_, level, attrs) =>
+                    `<h${Math.min(parseInt(level, 10) + offset, 6)}${attrs}>`,
+            )
+            .replace(
+                /<\/h([1-6])>/gi,
+                (_, level) => `</h${Math.min(parseInt(level, 10) + offset, 6)}>`,
+            );
+    }
+
+    return html
+        .replace(/<h([7-9]|\d{2,})([^>]*)>/gi, "<p$2>")
+        .replace(/<\/h([7-9]|\d{2,})>/gi, "</p>")
+        .trim();
 }
